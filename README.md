@@ -13,6 +13,8 @@ Python, Conda, Git Installs: https://docs.google.com/document/d/1pnCFWVuq8UvICXM
 These steps use a frame-directory workflow, which avoids the `decord` video
 reader dependency and works well with Python 3.11.
 
+Open a terminal to run the following:
+
 ```bash
 git clone https://github.com/jadenvc/video_annotator.git
 cd video_annotator
@@ -29,14 +31,14 @@ Install PyTorch, then install this project with the tracker GUI dependencies.
 Choose the PyTorch command for your machine from
 https://pytorch.org/get-started/locally/.
 
-For Apple Silicon Macs:
+For Apple Silicon Macs ():
 
 ```bash
 pip install torch torchvision
 pip install -e ".[tracker]"
 ```
 
-For CUDA/Linux, install the PyTorch CUDA build recommended by PyTorch, then run:
+For CUDA/Linux, install the PyTorch CUDA build recommended by PyTorch, then run (only run this if you have CUDA/Linux):
 
 ```bash
 pip install -e ".[tracker]"
