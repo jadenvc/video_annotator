@@ -1,3 +1,151 @@
+# Video Annotator
+
+Interactive video feature annotation and tracking built on
+[EdgeTAM](https://github.com/facebookresearch/EdgeTAM). This repo adds
+`run_tracker.py`, a PyQt GUI that lets you click a feature once, track it
+forward with EdgeTAM segmentation, label habitat/substrate/behavior metadata,
+and export an annotated video or JSON.
+
+## Quick Start
+
+These steps use a frame-directory workflow, which avoids the `decord` video
+reader dependency and works well with Python 3.11.
+
+```bash
+git clone https://github.com/jadenvc/video_annotator.git
+cd video_annotator
+```
+
+Create and activate a conda environment named `video_annotator`:
+
+```bash
+conda create -n video_annotator python=3.11 -y
+conda activate video_annotator
+```
+
+Install PyTorch, then install this project with the tracker GUI dependencies.
+Choose the PyTorch command for your machine from
+https://pytorch.org/get-started/locally/.
+
+For Apple Silicon Macs:
+
+```bash
+pip install torch torchvision
+pip install -e ".[tracker]"
+```
+
+For CUDA/Linux, install the PyTorch CUDA build recommended by PyTorch, then run:
+
+```bash
+pip install -e ".[tracker]"
+```
+
+Download the EdgeTAM checkpoint:
+
+```bash
+bash checkpoints/download_ckpts.sh
+```
+
+Install `ffmpeg` if you do not already have it:
+
+```bash
+# macOS
+brew install ffmpeg
+
+# Ubuntu/Debian
+sudo apt-get install ffmpeg
+```
+
+Extract frames from a video and launch the tracker:
+
+```bash
+./extract_frames.sh my_clip.mp4
+python run_tracker.py my_clip_frames/ --frames-dir
+```
+
+If your video is named `my_clip.mp4`, `extract_frames.sh` creates
+`my_clip_frames/`, so the run command would be:
+
+```bash
+python run_tracker.py my_clip_frames/ --frames-dir
+```
+
+## Tracker Usage
+
+1. Enable **Tracker Mode**.
+2. Choose **Point** or **BBox**.
+3. Set a confidence threshold. Start with `0.5`; lower it if tracking stops too
+   early, raise it if masks drift.
+4. Pick the feature type, behavior, environment, and substrate labels.
+5. Click or drag on the feature in the video frame.
+6. Use **Export Video** or **Save JSON** when you are done.
+
+Common commands:
+
+```bash
+# Basic frame-directory tracking
+python run_tracker.py my_clip_frames/ --frames-dir
+
+# Track longer through lower-confidence frames
+python run_tracker.py my_clip_frames/ --frames-dir --confidence 0.3
+
+# Force a device if auto-detection chooses poorly
+python run_tracker.py my_clip_frames/ --frames-dir --device cpu
+python run_tracker.py my_clip_frames/ --frames-dir --device mps
+python run_tracker.py my_clip_frames/ --frames-dir --device cuda
+```
+
+## Output Files
+
+The tracker can export:
+
+- `.tracked.mp4`: video with mask overlays
+- `.tracked.json`: feature metadata, bounding boxes, frame ranges, habitat,
+  substrate, behavior, and feature type
+- `.tracked_*.png`: summary plots
+
+Generated frames, checkpoints, and tracking outputs are intentionally ignored by
+git. Recreate them locally with the commands above.
+
+## Troubleshooting
+
+**Checkpoint not found**
+
+```bash
+bash checkpoints/download_ckpts.sh
+```
+
+**No JPEG files found**
+
+Make sure you ran frame extraction and are pointing at the created directory:
+
+```bash
+./extract_frames.sh my_clip.mp4
+python run_tracker.py my_clip_frames/ --frames-dir
+```
+
+**Qt/PyQt import error**
+
+```bash
+pip install PyQt5 opencv-python
+```
+
+**MPS or CUDA issue**
+
+Try CPU mode first to confirm the install works:
+
+```bash
+python run_tracker.py my_clip_frames/ --frames-dir --device cpu
+```
+
+## More Tracker Docs
+
+- [QUICKSTART.md](QUICKSTART.md): frame-directory workflow
+- [TRACKER_README.md](TRACKER_README.md): GUI and output details
+- [TRACKER_INSTALL.md](TRACKER_INSTALL.md): fuller install/troubleshooting notes
+
+---
+
 # EdgeTAM: On-Device Track Anything Model
 
 [Chong Zhou<sup>1,2*</sup>](https://chongzhou96.github.io/),

@@ -38,6 +38,10 @@ EXTRA_PACKAGES = {
         "opencv-python>=4.7.0",
         "eva-decord>=0.6.1",
     ],
+    "tracker": [
+        "opencv-python>=4.7.0",
+        "PyQt5>=5.15.0",
+    ],
     "dev": [
         "black==24.2.0",
         "usort==1.0.2",

@@ -1,33 +1,56 @@
-# EdgeTAM Feature Tracker — Installation Guide for M2 Mac
+# Video Annotator — Installation Guide
 
-This guide will help you install and run the EdgeTAM Feature Tracker on your M2 Mac.
+This guide installs the `run_tracker.py` GUI added on top of EdgeTAM.
 
 ## Prerequisites
 
-✅ **Already Installed** (based on your system):
-- Python 3.10.19
-- PyTorch 2.1.0 with MPS support
-- PyQt5 5.15.11
-- OpenCV 4.12.0
-- NumPy, hydra-core, tqdm, PIL
-- EdgeTAM model checkpoint (`checkpoints/edgetam.pt`)
+- Git
+- Conda or another Python environment manager
+- Python 3.11 recommended
+- `ffmpeg` for converting videos to JPEG frame directories
 
-## Additional Dependencies Needed
+## Install
 
-You only need to install one package: **`eva-decord`** (for video loading).
-
-### Option 1: Install via pip (Recommended)
+Clone the repo and create the `video_annotator` environment:
 
 ```bash
-pip install eva-decord
+git clone https://github.com/jadenvc/video_annotator.git
+cd video_annotator
+
+conda create -n video_annotator python=3.11 -y
+conda activate video_annotator
 ```
 
-### Option 2: Install via conda
+Install PyTorch. For Apple Silicon Macs, this is usually enough:
 
 ```bash
-conda install -c conda-forge eva-decord
+pip install torch torchvision
 ```
 
+For CUDA/Linux, use the command recommended by
+https://pytorch.org/get-started/locally/.
+
+Install the project and tracker dependencies:
+
+```bash
+pip install -e ".[tracker]"
+```
+
+Download the EdgeTAM checkpoint:
+
+```bash
+bash checkpoints/download_ckpts.sh
+```
+
+Install `ffmpeg` if needed:
+
+```bash
+# macOS
+brew install ffmpeg
+
+# Ubuntu/Debian
+sudo apt-get install ffmpeg
+```
 ---
 
 ## Verify Installation
@@ -35,28 +58,23 @@ conda install -c conda-forge eva-decord
 Run this quick check to verify all dependencies:
 
 ```bash
-cd /Users/jadenclark/Documents/ctag_api/EdgeTAM
-
 python -c "
 import torch
 import cv2
 import numpy as np
 from PyQt5.QtWidgets import QApplication
 from sam2.build_sam import build_sam2_video_predictor
-import decord
 print('✓ All dependencies installed')
 print(f'✓ PyTorch {torch.__version__}')
 print(f'✓ MPS available: {torch.backends.mps.is_available()}')
-print(f'✓ Decord {decord.__version__}')
 "
 ```
 
 Expected output:
 ```
 ✓ All dependencies installed
-✓ PyTorch 2.1.0
-✓ MPS available: True
-✓ Decord 0.6.1
+✓ PyTorch ...
+✓ MPS available: True/False
 ```
 
 ---
@@ -66,16 +84,14 @@ Expected output:
 ### Basic Usage
 
 ```bash
-cd /Users/jadenclark/Documents/ctag_api/EdgeTAM
+# Extract frames from a video
+./extract_frames.sh my_clip.mp4
 
-# Open file dialog to select video
-python run_tracker.py
-
-# Or specify a video directly
-python run_tracker.py path/to/your/video.mp4
+# Run the tracker on the created frame directory
+python run_tracker.py my_clip_frames/ --frames-dir
 
 # Set custom confidence threshold (default: 0.50)
-python run_tracker.py video.mp4 --confidence 0.3
+python run_tracker.py my_clip_frames/ --frames-dir --confidence 0.3
 ```
 
 ### Command-Line Options
@@ -86,7 +102,7 @@ usage: run_tracker.py [-h] [--confidence CONFIDENCE]
                       [--device DEVICE] [video]
 
 positional arguments:
-  video                 Path to an MP4 video file
+  video                 Path to an MP4 video file OR JPEG frame directory
 
 options:
   -h, --help            show this help message and exit
@@ -96,22 +112,23 @@ options:
                         Path to edgetam.pt checkpoint
   --config CONFIG       Hydra config name (default: edgetam.yaml)
   --device DEVICE       Force device (mps / cuda / cpu)
+  --frames-dir          Input is a directory of JPEG frames
 ```
 
 ### Examples
 
 ```bash
-# Use MPS acceleration on M2 Mac (default)
-python run_tracker.py shark_follow.mp4
+# Use frame-directory input
+python run_tracker.py shark_frames/ --frames-dir
 
 # Lower confidence = track longer (may lose precision)
-python run_tracker.py shark_follow.mp4 --confidence 0.2
+python run_tracker.py shark_frames/ --frames-dir --confidence 0.2
 
 # Higher confidence = stop earlier (more precise)
-python run_tracker.py shark_follow.mp4 --confidence 0.7
+python run_tracker.py shark_frames/ --frames-dir --confidence 0.7
 
 # Force CPU (slower but more compatible)
-python run_tracker.py video.mp4 --device cpu
+python run_tracker.py shark_frames/ --frames-dir --device cpu
 ```
 
 ---
@@ -206,7 +223,7 @@ The **confidence threshold** determines when to stop tracking:
 
 ---
 
-## Performance on M2 Mac
+## Performance on Apple Silicon
 
 - **Device**: MPS (Metal Performance Shaders) — Apple's GPU acceleration
 - **Expected FPS**: 5-15 FPS tracking speed (depends on video resolution)
@@ -226,14 +243,14 @@ The **confidence threshold** determines when to stop tracking:
 ### Issue: "Checkpoint not found"
 
 ```
-Checkpoint not found: /Users/jadenclark/Documents/ctag_api/EdgeTAM/checkpoints/edgetam.pt
+Checkpoint not found: /path/to/video_annotator/checkpoints/edgetam.pt
 Download with:  cd checkpoints && bash download_ckpts.sh
 ```
 
-**Solution**: The checkpoint already exists in your system (verified at 54M). If this error appears, ensure you're running from the EdgeTAM directory:
+**Solution**: Download the checkpoint and make sure you are running from the repo root:
 
 ```bash
-cd /Users/jadenclark/Documents/ctag_api/EdgeTAM
+bash checkpoints/download_ckpts.sh
 ls -lh checkpoints/edgetam.pt  # Should show ~54M file
 ```
 
@@ -246,11 +263,11 @@ pip install eva-decord
 
 ### Issue: "MPS backend not available"
 
-**Solution**: MPS requires macOS 12.3+ and PyTorch 1.12+. You're already on PyTorch 2.1.0, so this should work. If not:
+**Solution**: MPS requires macOS 12.3+ and a recent PyTorch. If it is unavailable:
 
 ```bash
 # Force CPU mode
-python run_tracker.py video.mp4 --device cpu
+python run_tracker.py my_clip_frames/ --frames-dir --device cpu
 ```
 
 ### Issue: Tracking stops immediately
@@ -279,8 +296,8 @@ python run_tracker.py video.mp4 --device cpu
 
 1. **Launch the tracker**:
    ```bash
-   cd /Users/jadenclark/Documents/ctag_api/EdgeTAM
-   python run_tracker.py examples/01_dog.mp4
+   ./extract_frames.sh examples/01_dog.mp4
+   python run_tracker.py 01_dog_frames/ --frames-dir
    ```
 
 2. **Enable Tracker Mode** (check the checkbox)
@@ -411,7 +428,7 @@ When you click **"Save JSON"**, the tracker exports this format:
 
 ## Next Steps
 
-- **Try it out**: `python run_tracker.py examples/01_dog.mp4`
+- **Try it out**: `./extract_frames.sh examples/01_dog.mp4 && python run_tracker.py 01_dog_frames/ --frames-dir`
 - **Experiment with confidence**: Try values from 0.2 to 0.8
 - **Track multiple features**: Click on different objects in different frames
 - **Export and review**: See how the masks look in the final video

@@ -1,6 +1,21 @@
-# EdgeTAM Feature Tracker — Quick Start (No Decord Required!)
+# Video Annotator — Quick Start (No Decord Required)
 
-Since you're on Python 3.11 and decord requires Python 3.8-3.10, you can use **frame directories** instead of video files.
+Use **frame directories** instead of video files. This avoids the optional
+`decord` dependency and works with Python 3.11.
+
+## Setup
+
+```bash
+git clone https://github.com/jadenvc/video_annotator.git
+cd video_annotator
+
+conda create -n video_annotator python=3.11 -y
+conda activate video_annotator
+
+pip install torch torchvision
+pip install -e ".[tracker]"
+bash checkpoints/download_ckpts.sh
+```
 
 ## Two-Step Process
 
@@ -32,21 +47,18 @@ frames/
 ### Step 2: Run the Tracker
 
 ```bash
-cd /Users/jadenclark/Documents/ctag_api/EdgeTAM
-
-# Run with frame directory
 python run_tracker.py frames/ --frames-dir
 ```
 
-That's it! No decord needed. 🎉
+That's it. No decord needed.
 
 ---
 
 ## Full Example
 
 ```bash
-# Navigate to EdgeTAM
-cd /Users/jadenclark/Documents/ctag_api/EdgeTAM
+# Navigate to the repo
+cd video_annotator
 
 # Extract frames from example video
 mkdir shark_frames

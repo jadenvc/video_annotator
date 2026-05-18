@@ -39,13 +39,25 @@ See **[QUICKSTART.md](QUICKSTART.md)** for detailed frame extraction guide.
 
 ## 📋 Requirements
 
-**Already installed on your system:**
-- ✅ Python 3.10.19
-- ✅ PyTorch 2.1.0 (MPS support)
-- ✅ PyQt5, OpenCV, NumPy
-- ✅ EdgeTAM checkpoint (54MB)
+Install these in a fresh environment:
 
-**No additional dependencies needed!**
+```bash
+conda create -n video_annotator python=3.11 -y
+conda activate video_annotator
+pip install torch torchvision
+pip install -e ".[tracker]"
+bash checkpoints/download_ckpts.sh
+```
+
+You also need `ffmpeg` to extract video frames:
+
+```bash
+# macOS
+brew install ffmpeg
+
+# Ubuntu/Debian
+sudo apt-get install ffmpeg
+```
 
 ---
 
@@ -320,7 +332,7 @@ EdgeTAM/
 
 ## ⚙️ Performance
 
-**On M2 Mac:**
+**On Apple Silicon:**
 - Device: MPS (Metal Performance Shaders)
 - Tracking speed: 5-15 FPS (depends on resolution)
 - Memory: ~2-4 GB for 720p
