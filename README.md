@@ -6,6 +6,8 @@ Interactive video feature annotation and tracking built on
 forward with EdgeTAM segmentation, label habitat/substrate/behavior metadata,
 and export an annotated video or JSON.
 
+Python, Conda, Git Installs: https://docs.google.com/document/d/1pnCFWVuq8UvICXM2AhbsmBlEx7_T8YBW-TC2Ovg9Wxk/edit?usp=sharing
+
 ## Quick Start
 
 These steps use a frame-directory workflow, which avoids the `decord` video
