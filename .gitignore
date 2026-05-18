@@ -9,3 +9,9 @@ _C.*
 outputs/*
 coreml_models/*
 checkpoints/*.pt
+frames_dir/
+frame_dir/
+*_frames/
+*.tracked.mp4
+*.tracked.json
+*.tracked_*.png
