@@ -119,16 +119,5 @@ coll = COLLECT(
     upx=False,
     name='EdgeTAM Tracker',
 )
-
-app = BUNDLE(
-    coll,
-    name='EdgeTAM Tracker.app',
-    icon=None,
-    bundle_identifier='com.ctag.edgetam-tracker',
-    info_plist={
-        'NSHighResolutionCapable': True,
-        'NSPrincipalClass': 'NSApplication',
-        'NSAppleScriptEnabled': False,
-        'CFBundleShortVersionString': '1.0.0',
-    },
-)
+# No BUNDLE here — build_app.sh wraps the COLLECT output into a .app manually
+# so that everything stays flat in Contents/MacOS/ and codesign works cleanly.
