@@ -1694,10 +1694,13 @@ def main():
     device = args.device or _detect_device()
     print(f"Device: {device}")
 
-    # find checkpoint
+    # find checkpoint — handle both normal and PyInstaller-frozen execution
     ckpt = args.checkpoint
     if ckpt is None:
-        here = os.path.dirname(os.path.abspath(__file__))
+        if getattr(sys, 'frozen', False):
+            here = os.path.dirname(sys.executable)
+        else:
+            here = os.path.dirname(os.path.abspath(__file__))
         ckpt = os.path.join(here, "checkpoints", "edgetam.pt")
     if not os.path.isfile(ckpt):
         sys.exit(f"Checkpoint not found: {ckpt}\n"
