@@ -19,6 +19,8 @@ import sys
 import os
 import json
 import argparse
+import shutil
+import tempfile
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 
@@ -36,7 +38,7 @@ try:
         QVBoxLayout, QFileDialog, QMessageBox, QListWidget,
         QListWidgetItem, QGroupBox, QLineEdit, QCheckBox, QRadioButton,
         QButtonGroup, QDoubleSpinBox, QProgressBar, QComboBox, QToolButton,
-        QFrame, QSizePolicy,
+        QFrame, QSizePolicy, QProgressDialog,
     )
     _QT6 = True
 except ImportError:
@@ -47,7 +49,7 @@ except ImportError:
         QVBoxLayout, QFileDialog, QMessageBox, QListWidget,
         QListWidgetItem, QGroupBox, QLineEdit, QCheckBox, QRadioButton,
         QButtonGroup, QDoubleSpinBox, QProgressBar, QComboBox, QToolButton,
-        QFrame, QSizePolicy,
+        QFrame, QSizePolicy, QProgressDialog,
     )
     _QT6 = False
 
@@ -723,7 +725,9 @@ class AnnotationTimeline(QWidget):
 
 class MainWindow(QMainWindow):
     def __init__(self, video_path: str, predictor, inference_state,
-                 default_confidence: float, is_frame_dir: bool = False):
+                 default_confidence: float, is_frame_dir: bool = False,
+                 temp_dir: Optional[str] = None,
+                 store_video_path: Optional[str] = None):
         super().__init__()
         self.setWindowTitle("EdgeTAM Tracker")
 
@@ -731,6 +735,7 @@ class MainWindow(QMainWindow):
         self.predictor = predictor
         self.inference_state = inference_state
         self.is_frame_dir = is_frame_dir
+        self.temp_dir = temp_dir
 
         # For frame directories, load frame list
         if is_frame_dir:
@@ -759,8 +764,8 @@ class MainWindow(QMainWindow):
         self.playing = False
 
         # state
-        self.store = FeatureStore(video_path, self.fps, self.total_frames,
-                                  self.video_w, self.video_h)
+        self.store = FeatureStore(store_video_path or video_path, self.fps,
+                                  self.total_frames, self.video_w, self.video_h)
         self.tracking_worker: Optional[TrackingWorker] = None
         self._pending_masks: Dict[int, np.ndarray] = {}
         self._pending_bboxes: Dict[int, Tuple[int, int, int, int]] = {}
@@ -1642,12 +1647,53 @@ class MainWindow(QMainWindow):
             self.tracking_worker.wait(3000)
         if self.cap is not None:
             self.cap.release()
+        if self.temp_dir and os.path.isdir(self.temp_dir):
+            shutil.rmtree(self.temp_dir, ignore_errors=True)
         ev.accept()
 
 
 # --------------------------------------------------------------------------
 # CLI
 # --------------------------------------------------------------------------
+
+def _extract_frames(video_path: str, out_dir: str) -> int:
+    """Extract every frame from video_path as a JPEG into out_dir using cv2.
+
+    Files are named 00000.jpg, 00001.jpg … so MainWindow's frame-dir loader
+    can sort them by integer stem. Returns the number of frames written.
+    """
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise RuntimeError(f"Cannot open video: {video_path}")
+
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    modal = Qt.WindowModality.ApplicationModal if _QT6 else Qt.ApplicationModal
+
+    dlg = QProgressDialog("Extracting frames…", None, 0, max(total, 1))
+    dlg.setWindowTitle("Loading video")
+    dlg.setMinimumDuration(0)
+    dlg.setWindowModality(modal)
+    dlg.setValue(0)
+    dlg.show()
+
+    idx = 0
+    while True:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        cv2.imwrite(
+            os.path.join(out_dir, f"{idx:05d}.jpg"),
+            frame,
+            [cv2.IMWRITE_JPEG_QUALITY, 95],
+        )
+        idx += 1
+        dlg.setValue(idx)
+        QApplication.processEvents()
+
+    cap.release()
+    dlg.close()
+    return idx
+
 
 def _detect_device():
     if torch.backends.mps.is_available():
@@ -1706,21 +1752,6 @@ def main():
         sys.exit(f"Checkpoint not found: {ckpt}\n"
                  "Download with:  cd checkpoints && bash download_ckpts.sh")
 
-    # Check for decord if using video files
-    if not args.frames_dir:
-        try:
-            import decord  # noqa: F401
-        except ImportError:
-            print("\n⚠️  WARNING: decord not installed!")
-            print("Without decord, you must use frame directories instead of video files.\n")
-            print("Options:")
-            print("  1. Extract frames with ffmpeg, then use --frames-dir:")
-            print("     ffmpeg -i video.mp4 -q:v 2 -start_number 0 frames/%05d.jpg")
-            print("     python run_tracker.py frames/ --frames-dir\n")
-            print("  2. Install decord (requires Python 3.8-3.10):")
-            print("     pip install eva-decord\n")
-            sys.exit(1)
-
     print("Loading EdgeTAM model ...")
     predictor = build_sam2_video_predictor(args.config, ckpt, device=device)
     print("Model loaded.")
@@ -1728,32 +1759,27 @@ def main():
     _enable_hidpi()
     app = QApplication(sys.argv)
 
-    # Fusion + modern stylesheet
     try:
         app.setStyle("Fusion")
     except Exception:
         pass
     app.setStyleSheet(APP_QSS)
 
-    # Slightly nicer global font
     f = QFont()
     f.setPointSize(12)
     app.setFont(f)
 
     video_path = args.video
-    if not video_path:
-        if args.frames_dir:
+    is_frame_dir = args.frames_dir
+    temp_frames_dir = None
+    original_video_path = None
+
+    if is_frame_dir:
+        # --- frames directory mode (explicit --frames-dir flag) ---
+        if not video_path:
             video_path = QFileDialog.getExistingDirectory(None, "Select frames directory")
-        else:
-            video_path, _ = QFileDialog.getOpenFileName(
-                None, "Open video", "",
-                "Video (*.mp4 *.MP4 *.mov *.avi *.mkv)"
-            )
         if not video_path:
             sys.exit(0)
-
-    # Validate input
-    if args.frames_dir:
         if not os.path.isdir(video_path):
             sys.exit(f"Frames directory not found: {video_path}")
         jpegs = [fn for fn in os.listdir(video_path) if fn.lower().endswith(('.jpg', '.jpeg'))]
@@ -1761,8 +1787,31 @@ def main():
             sys.exit(f"No JPEG files found in: {video_path}")
         print(f"Found {len(jpegs)} JPEG frames")
     else:
+        # --- video file mode: show dialog, then extract frames internally ---
+        if not video_path:
+            video_path, _ = QFileDialog.getOpenFileName(
+                None, "Open video", "",
+                "Video (*.mp4 *.MP4 *.mov *.avi *.mkv)"
+            )
+        if not video_path:
+            sys.exit(0)
         if not os.path.isfile(video_path):
             sys.exit(f"Video not found: {video_path}")
+
+        original_video_path = video_path
+        temp_frames_dir = tempfile.mkdtemp(prefix="edgetam_frames_")
+        print(f"Extracting frames to: {temp_frames_dir}")
+        try:
+            n_frames = _extract_frames(video_path, temp_frames_dir)
+        except Exception as e:
+            shutil.rmtree(temp_frames_dir, ignore_errors=True)
+            sys.exit(f"Frame extraction failed: {e}")
+        if n_frames == 0:
+            shutil.rmtree(temp_frames_dir, ignore_errors=True)
+            sys.exit(f"No frames could be read from: {video_path}")
+        print(f"Extracted {n_frames} frames")
+        video_path = temp_frames_dir
+        is_frame_dir = True
 
     print(f"Initialising: {video_path}")
     inference_state = predictor.init_state(
@@ -1772,8 +1821,12 @@ def main():
     )
     print(f"Ready — {inference_state['num_frames']} frames")
 
-    win = MainWindow(video_path, predictor, inference_state,
-                     args.confidence, is_frame_dir=args.frames_dir)
+    win = MainWindow(
+        video_path, predictor, inference_state, args.confidence,
+        is_frame_dir=is_frame_dir,
+        temp_dir=temp_frames_dir,
+        store_video_path=original_video_path,
+    )
     win.resize(1320, 860)
     win.show()
     sys.exit(app.exec())
