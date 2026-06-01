@@ -347,6 +347,12 @@ class VideoLabel(QLabel):
         self._start = None
         self._end = None
         self._is_drag = False
+        self._bbox_mode = False
+
+    def set_bbox_mode(self, on: bool):
+        self._bbox_mode = on
+        cursor = Qt.CursorShape.CrossCursor if (_QT6 and on) else (Qt.CrossCursor if on else Qt.ArrowCursor) if not _QT6 else Qt.CursorShape.ArrowCursor
+        self.setCursor(cursor)
 
     def set_frame_pixmap(self, pix):
         self.setPixmap(pix)
@@ -357,8 +363,42 @@ class VideoLabel(QLabel):
             return ev.position().toPoint()
         return ev.pos()
 
+    def mousePressEvent(self, ev):
+        btn = Qt.MouseButton.LeftButton if _QT6 else Qt.LeftButton
+        if self._bbox_mode and ev.button() == btn:
+            self._drawing = True
+            self._start = self._ev_pos(ev)
+            self._end = self._start
+            self._is_drag = False
+            self.update()
+
+    def mouseMoveEvent(self, ev):
+        if self._drawing:
+            self._end = self._ev_pos(ev)
+            if (abs(self._end.x() - self._start.x()) > 5 or
+                    abs(self._end.y() - self._start.y()) > 5):
+                self._is_drag = True
+            self.update()
+
+    def mouseReleaseEvent(self, ev):
+        btn = Qt.MouseButton.LeftButton if _QT6 else Qt.LeftButton
+        if ev.button() == btn and self._drawing:
+            self._drawing = False
+            self._end = self._ev_pos(ev)
+            if self._is_drag:
+                self.bboxDrawn.emit(self._start, self._end)
+            self._start = self._end = None
+            self.update()
+
     def paintEvent(self, ev):
         super().paintEvent(ev)
+        if self._drawing and self._start and self._end and self._is_drag:
+            p = QPainter(self)
+            pen_style = Qt.PenStyle.SolidLine if _QT6 else Qt.SolidLine
+            p.setPen(QPen(QColor(79, 70, 229), 2, pen_style))
+            x1, y1 = self._start.x(), self._start.y()
+            x2, y2 = self._end.x(), self._end.y()
+            p.drawRect(min(x1, x2), min(y1, y2), abs(x2 - x1), abs(y2 - y1))
 
 
 # --------------------------------------------------------------------------
@@ -684,6 +724,7 @@ class MainWindow(QMainWindow):
         # environment/substrate selection (persist-until-changed)
         self._current_env = ENV_OPTIONS[0]
         self._current_substrate = SUBSTRATE_OPTIONS[0]
+        self._type_counters: Dict[str, int] = {}
 
         # playback timer
         self.timer = QTimer(self)
@@ -788,11 +829,36 @@ class MainWindow(QMainWindow):
         load_json_btn.setObjectName("Secondary")
         load_json_btn.clicked.connect(self._load_json)
 
+        # Feature type + behavior combos
+        self.type_combo = QComboBox()
+        self.type_combo.addItems(FEATURE_TYPES)
+        self.behavior_combo = QComboBox()
+        self.behavior_combo.addItems(BEHAVIOR_OPTIONS)
+
+        type_row = QHBoxLayout()
+        type_row.addWidget(QLabel("Type:"))
+        type_row.addWidget(self.type_combo, stretch=1)
+
+        beh_row = QHBoxLayout()
+        beh_row.addWidget(QLabel("Behavior:"))
+        beh_row.addWidget(self.behavior_combo, stretch=1)
+
+        # Draw bbox toggle button
+        self.bbox_btn = QPushButton("Draw Bbox")
+        self.bbox_btn.setCheckable(True)
+        self.bbox_btn.toggled.connect(self._bbox_mode_toggled)
+
+        # Wire bbox signal
+        self.video_label.bboxDrawn.connect(self._on_bbox)
+
         # Pack into a "card"
         card_layout = QVBoxLayout()
-        card_layout.addWidget(QLabel("Annotated Features (read-only):"))
-        card_layout.addWidget(self.feat_list, stretch=1)
+        card_layout.addLayout(type_row)
+        card_layout.addLayout(beh_row)
         card_layout.addLayout(name_row)
+        card_layout.addWidget(self.bbox_btn)
+        card_layout.addWidget(QLabel("Annotated Features:"))
+        card_layout.addWidget(self.feat_list, stretch=1)
         card_layout.addLayout(fa)
         card_layout.addWidget(load_json_btn)
         card_layout.addWidget(exp_btn)
@@ -805,7 +871,7 @@ class MainWindow(QMainWindow):
         card_v.setSpacing(10)
         title = QLabel("Controls")
         title.setObjectName("Title")
-        subtitle = QLabel("Label environment & substrate. Load a JSON to review features.")
+        subtitle = QLabel("Label environment & substrate. Draw bboxes to annotate features on individual frames.")
         subtitle.setObjectName("Subtle")
         card_v.addWidget(title)
         card_v.addWidget(subtitle)
@@ -865,6 +931,65 @@ class MainWindow(QMainWindow):
         self._refresh_features()
 
     # ------------------------------------------------------------ env/sub
+    def _bbox_mode_toggled(self, on: bool):
+        self.video_label.set_bbox_mode(on)
+        self.statusBar().showMessage("Draw a bbox on the video to annotate a feature." if on else "")
+
+    def _on_bbox(self, p1, p2):
+        m1 = self._map(p1.x(), p1.y())
+        m2 = self._map(p2.x(), p2.y())
+        if m1 is None or m2 is None:
+            return
+        x1, y1 = min(m1[0], m2[0]), min(m1[1], m2[1])
+        x2, y2 = max(m1[0], m2[0]), max(m1[1], m2[1])
+        if abs(x2 - x1) < 5 or abs(y2 - y1) < 5:
+            return
+
+        ftype = self.type_combo.currentText() or "Other"
+        name = (self.name_edit.text() or "").strip()
+        if not name:
+            n = self._type_counters.get(ftype, 1)
+            name = f"{ftype.lower()}_{n}"
+            self._type_counters[ftype] = n + 1
+            self.name_edit.setText(name)
+
+        fidx = self.current_frame_idx
+        feat = TrackedFeature(
+            name=name,
+            feature_type=ftype,
+            init_frame=fidx,
+            end_frame=fidx,
+            init_type="bbox",
+            init_coords=[x1, y1, x2, y2],
+            confidence_threshold=0.0,
+            behavior=self.behavior_combo.currentText() or "Swimming",
+        )
+        self.store.add_feature(feat, {}, {fidx: (x1, y1, x2, y2)})
+        self._refresh_features()
+        self._display_frame(fidx)
+        if hasattr(self, "timeline"):
+            self.timeline.update()
+        self.statusBar().showMessage(
+            f"Added {ftype} '{name}' on frame {fidx}."
+        )
+        # clear name field so next annotation gets a fresh auto-name
+        self.name_edit.clear()
+
+    def _map(self, lx: int, ly: int) -> Optional[Tuple[int, int]]:
+        """Label-widget coords → video-frame coords."""
+        pix = self.video_label.pixmap()
+        if pix is None:
+            return None
+        lw, lh = self.video_label.width(), self.video_label.height()
+        pw, ph = pix.width(), pix.height()
+        ox, oy = (lw - pw) // 2, (lh - ph) // 2
+        x, y = lx - ox, ly - oy
+        if x < 0 or y < 0 or x >= pw or y >= ph:
+            return None
+        fx = max(0, min(int(x * self.video_w / pw), self.video_w - 1))
+        fy = max(0, min(int(y * self.video_h / ph), self.video_h - 1))
+        return (fx, fy)
+
     def _on_env_selected(self, label: str):
         self._current_env = label
         self.store.set_env(self.current_frame_idx, label)
