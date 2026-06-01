@@ -1,0 +1,90 @@
+name: Build CTAG Annotator
+
+on:
+  push:
+    branches: [annotator-only]
+  workflow_dispatch:   # allows manual trigger from GitHub UI
+
+jobs:
+  build-mac:
+    runs-on: macos-latest   # Apple Silicon (M-series)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install PyQt6 opencv-python numpy matplotlib pyinstaller
+
+      - name: Build
+        run: pyinstaller annotator.spec --noconfirm
+
+      - name: Clean & sign
+        run: |
+          find "dist/CTAG Annotator.app" -name "*.dist-info" -type d -exec rm -rf {} + 2>/dev/null || true
+          find "dist/CTAG Annotator.app" -name ".dylibs" -type d -exec rm -rf {} + 2>/dev/null || true
+          for PYDIR in "dist/CTAG Annotator.app/Contents/Frameworks/python3.11" \
+                       "dist/CTAG Annotator.app/Contents/Resources/python3.11"; do
+            if [ -d "$PYDIR" ] && [ ! -f "$PYDIR/Info.plist" ]; then
+              cat > "$PYDIR/Info.plist" << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+              <key>CFBundleIdentifier</key><string>com.ctag.annotator.python311</string>
+              <key>CFBundlePackageType</key><string>FMWK</string>
+              <key>CFBundleVersion</key><string>3.11</string>
+          </dict></plist>
+          PLIST
+            fi
+          done
+          find "dist/CTAG Annotator.app/Contents" -type f | while read -r f; do
+            file -b "$f" 2>/dev/null | grep -q "Mach-O" && codesign --force --sign - "$f" 2>/dev/null || true
+          done || true
+          for PYDIR in "dist/CTAG Annotator.app/Contents/Frameworks/python3.11" \
+                       "dist/CTAG Annotator.app/Contents/Resources/python3.11"; do
+            [ -f "$PYDIR/Info.plist" ] && codesign --force --sign - "$PYDIR" 2>/dev/null || true
+          done
+          codesign --force --deep --sign - "dist/CTAG Annotator.app" 2>&1 || true
+          xattr -cr "dist/CTAG Annotator.app" 2>/dev/null || true
+
+      - name: Zip
+        run: |
+          cd dist
+          zip -r --symlinks "CTAG Annotator-mac.zip" "CTAG Annotator.app"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CTAG-Annotator-mac
+          path: dist/CTAG Annotator-mac.zip
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install PyQt6 opencv-python numpy matplotlib pyinstaller
+
+      - name: Build
+        run: pyinstaller annotator.spec --noconfirm
+
+      - name: Zip
+        run: |
+          cd dist
+          Compress-Archive -Path "CTAG Annotator" -DestinationPath "CTAG Annotator-windows.zip"
+        shell: pwsh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CTAG-Annotator-windows
+          path: dist/CTAG Annotator-windows.zip

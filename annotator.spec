@@ -40,16 +40,18 @@ coll = COLLECT(
     name='CTAG Annotator',
 )
 
-app = BUNDLE(
-    coll,
-    name='CTAG Annotator.app',
-    icon=None,
-    bundle_identifier='com.ctag.annotator',
-    info_plist={
-        'CFBundleDisplayName': 'CTAG Annotator',
-        'CFBundleShortVersionString': '1.0.0',
-        'NSHighResolutionCapable': True,
-        'NSPrincipalClass': 'NSApplication',
-        'NSAppleScriptEnabled': False,
-    },
-)
+import sys as _sys
+if _sys.platform == 'darwin':
+    app = BUNDLE(
+        coll,
+        name='CTAG Annotator.app',
+        icon=None,
+        bundle_identifier='com.ctag.annotator',
+        info_plist={
+            'CFBundleDisplayName': 'CTAG Annotator',
+            'CFBundleShortVersionString': '1.0.0',
+            'NSHighResolutionCapable': True,
+            'NSPrincipalClass': 'NSApplication',
+            'NSAppleScriptEnabled': False,
+        },
+    )
