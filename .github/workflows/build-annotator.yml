@@ -7,7 +7,16 @@ on:
 
 jobs:
   build-mac:
-    runs-on: macos-latest   # Apple Silicon (M-series)
+    strategy:
+      matrix:
+        include:
+          - runner: macos-latest   # Apple Silicon (M1+)
+            artifact: CTAG-Annotator-mac-arm64
+            zipname: CTAG Annotator-mac-arm64.zip
+          - runner: macos-13       # Intel x86_64
+            artifact: CTAG-Annotator-mac-intel
+            zipname: CTAG Annotator-mac-intel.zip
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
 
@@ -53,13 +62,13 @@ jobs:
       - name: Zip
         run: |
           cd dist
-          zip -r --symlinks "CTAG Annotator-mac.zip" "CTAG Annotator.app"
+          zip -r --symlinks "${{ matrix.zipname }}" "CTAG Annotator.app"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CTAG-Annotator-mac
-          path: dist/CTAG Annotator-mac.zip
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.zipname }}
 
   build-windows:
     runs-on: windows-latest
