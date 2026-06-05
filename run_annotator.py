@@ -4,7 +4,7 @@ CTAG Annotator — Scene label annotation for underwater video.
 
 Stripped-down version of EdgeTAM Feature Tracker.  All torch / SAM2 / hydra /
 timm dependencies have been removed.  This file contains only:
-  - Scene label (environment + substrate) annotation bars
+  - Scene label (behavior + habitat) annotation bars
   - Read-only feature list (features loaded from a saved JSON, if any)
   - Video playback and frame seeking
   - Bottom timeline scrubber
@@ -34,22 +34,22 @@ import numpy as np
 # --------------------------------------------------------------------------
 try:
     from PyQt6.QtCore import Qt, QTimer, QSize, pyqtSignal
-    from PyQt6.QtGui import QImage, QPixmap, QPainter, QPen, QColor, QFont
+    from PyQt6.QtGui import QImage, QPixmap, QPainter, QPen, QColor, QFont, QShortcut, QKeySequence
     from PyQt6.QtWidgets import (
         QApplication, QMainWindow, QWidget, QLabel, QPushButton, QHBoxLayout,
         QVBoxLayout, QFileDialog, QMessageBox, QListWidget,
         QListWidgetItem, QGroupBox, QLineEdit, QComboBox, QToolButton,
-        QFrame, QSizePolicy, QProgressDialog,
+        QFrame, QSizePolicy, QProgressDialog, QSpinBox, QCompleter,
     )
     _QT6 = True
 except ImportError:
     from PyQt5.QtCore import Qt, QTimer, QSize, pyqtSignal
-    from PyQt5.QtGui import QImage, QPixmap, QPainter, QPen, QColor, QFont
+    from PyQt5.QtGui import QImage, QPixmap, QPainter, QPen, QColor, QFont, QShortcut, QKeySequence
     from PyQt5.QtWidgets import (
         QApplication, QMainWindow, QWidget, QLabel, QPushButton, QHBoxLayout,
         QVBoxLayout, QFileDialog, QMessageBox, QListWidget,
         QListWidgetItem, QGroupBox, QLineEdit, QComboBox, QToolButton,
-        QFrame, QSizePolicy, QProgressDialog,
+        QFrame, QSizePolicy, QProgressDialog, QSpinBox, QCompleter,
     )
     _QT6 = False
 
@@ -57,12 +57,171 @@ except ImportError:
 # Modern UI constants
 # --------------------------------------------------------------------------
 
-ENV_OPTIONS = ["Mangrove", "Reef", "Open Ocean"]
-SUBSTRATE_OPTIONS = ["Sand", "Rock", "Coral", "Seagrass", "Rubble", "Mud", "Other"]
+BEHAVIOR_OPTIONS = [
+    "1 - Burst swimming",
+    "2 - Low-speed swimming",
+    "3 - Stationary (alone)",
+    "4 - Foraging",
+    "5 - Following a shark",
+    "6 - Shark following tagged",
+    "7 - Parallel swimming",
+    "8 - Brief interaction",
+    "9 - Stationary with 1+ sharks",
+]
 
-FEATURE_TYPES = ["Fish", "Shark", "Ray", "Turtle", "Diver", "Other"]
+HABITAT_OPTIONS = ["Mangrove", "Rocky reef", "Sandy bottom", "Gravel", "Mud"]
 
-BEHAVIOR_OPTIONS = ["Swimming", "Resting", "Foraging", "Interacting"]
+SPECIES_CATEGORIES = {
+    "Shark": [
+        "Lemon shark (Negaprion brevirostris)",
+        "Pacific nurse shark (Ginglymostoma unami)",
+    ],
+    "Ray": [
+        "Longtail stingray (Hypanus longus)",
+        "Pacific chupare stingray (Styracura pacifica)",
+        "Longtail butterfly ray (Gymnura crebipunctata)",
+        "Munk's devil ray (Mobula munkiana)",
+        "Pacific eagle ray (Aetobatus laticeps)",
+        "Speckled guitarfish (Pseudobatos glaucostygma)",
+        "Prahl's guitarfish (Pseudobatos prahli)",
+        "Pacific cownose ray (Rhinoptera steindachneri)",
+        "Leopard round ray (Urobatis pardalis)",
+        "Chilean round ray (Urotrygon chilensis)",
+    ],
+    "Teleost fish": [
+        "Convict surgeonfish (Acanthurus triostegus)",
+        "Yellowfin surgeonfish (Acanthurus xanthopterus)",
+        "Razor surgeonfish (Prionurus laticlavius)",
+        "Dovi's cardinalfish (Apogon dovii)",
+        "Chinese trumpetfish (Aulostomus chinensis)",
+        "Finescale triggerfish (Balistes polylepis)",
+        "Stone triggerfish (Pseudobalistes naufragium)",
+        "Orangeside triggerfish (Sufflamen verres)",
+        "Pacific agujon needlefish (Tylosurus fodiator)",
+        "Large-banded blenny (Ophioblennius steindachneri)",
+        "Sabertooth blenny (Plagiotremus azaleus)",
+        "Leopard flounder (Bothus leopardinus)",
+        "African pompano (Alectis ciliaris)",
+        "Green jack (Caranx caballus)",
+        "Pacific crevalle jack (Caranx caninus)",
+        "Bigeye trevally (Caranx sexfasciatus)",
+        "Rainbow runner (Elagatis bipinnulata)",
+        "Golden trevally (Gnathanodon speciosus)",
+        "Almaco jack (Seriola rivoliana)",
+        "Paita pompano (Trachinotus paitensis)",
+        "Blackblotch pompano (Trachinotus kennedyi)",
+        "Gafftopsail pompano (Trachinotus rhodopus)",
+        "Blackfin snook (Centropomus medius)",
+        "Roughcheek barnacle blenny (Acanthemblemaria exilispinus)",
+        "Hancock's blenny (Acanthemblemaria hancocki)",
+        "Delta pikeblenny (Chaenopsis deltarrhis)",
+        "Threebanded butterflyfish (Chaetodon humeralis)",
+        "Barberfish (Johnrandallia nigrirostris)",
+        "Giant hawkfish (Cirrhitus rivulatus)",
+        "Coral hawkfish (Cirrhitichthys oxycephalus)",
+        "Dolphinfish / mahi-mahi (Coryphaena hippurus)",
+        "Spotfin burrfish (Chilomycterus reticulatus)",
+        "Balloonfish (Diodon holocanthus)",
+        "Spotted porcupinefish (Diodon hystrix)",
+        "Pacific ladyfish (Elops affinis)",
+        "Pacific spadefish (Chaetodipterus zonatus)",
+        "Bluespotted cornetfish (Fistularia commersonii)",
+        "Pacific flagfin mojarra (Eucinostomus currani)",
+        "Slender mojarra (Gerres simillimus)",
+        "Redlight goby (Coryphopterus urospilus)",
+        "Spotted cleaner goby (Elacatinus puncticulatus)",
+        "Burrito grunt (Anisotremus interruptus)",
+        "Panamic porkfish (Anisotremus taeniatus)",
+        "Yellowspotted grunt (Haemulon flaviguttatum)",
+        "Spottail grunt (Haemulon maculicauda)",
+        "Scudder's grunt (Haemulon scudderii)",
+        "Greybar grunt (Haemulon sexfasciatum)",
+        "Chere-chere grunt (Haemulon steindachneri)",
+        "Goldeneye grunt (Microlepidotus brevipinnis)",
+        "Panamic soldierfish (Myripristis leiognathus)",
+        "Tinsel squirrelfish (Sargocentron suborbitale)",
+        "Cortez sea chub (Kyphosus elegans)",
+        "Blue-bronze sea chub (Kyphosus ocyurus)",
+        "Mexican hogfish (Bodianus diplotaenia)",
+        "Wounded wrasse (Halichoeres chierchiae)",
+        "Chameleon wrasse (Halichoeres dispilus)",
+        "Spinster wrasse (Halichoeres nicholsi)",
+        "Bicolor wrasse (Halichoeres notospilus)",
+        "Peacock razorfish (Iniistius pavo)",
+        "Rockmover wrasse (Novaculichthys taeniourus)",
+        "Sunset wrasse (Thalassoma grammaticum)",
+        "Cortez rainbow wrasse (Thalassoma lucasanum)",
+        "Panamic fanged blenny (Malacoctenus sudensis)",
+        "Barred pargo (Hoplopagrus guentherii)",
+        "Mullet snapper (Lutjanus aratus)",
+        "Yellow snapper (Lutjanus argentiventris)",
+        "Colorado snapper (Lutjanus colorado)",
+        "Spotted rose snapper (Lutjanus guttatus)",
+        "Golden snapper (Lutjanus inermis)",
+        "Pacific dog snapper (Lutjanus novemfasciatus)",
+        "Shortjaw tilefish (Malacanthus brevirostris)",
+        "Unicorn filefish (Aluterus monoceros)",
+        "Scrawled filefish (Aluterus scriptus)",
+        "White mullet (Mugil curema)",
+        "Mexican goatfish (Mulloidichthys dentatus)",
+        "Bigscale goatfish (Pseudupeneus grandisquamis)",
+        "Snowflake moray (Echidna nebulosa)",
+        "Freckled moray (Echidna nocturna)",
+        "Zebra moray (Gymnomuraena zebra)",
+        "Chestnut moray (Gymnothorax castaneus)",
+        "Dovi's moray (Gymnothorax dovii)",
+        "Yellowmargin moray (Gymnothorax flavimarginatus)",
+        "Panamic green moray (Gymnothorax panamensis)",
+        "Undulated moray (Gymnothorax undulatus)",
+        "Argus moray (Muraena argus)",
+        "Hourglass moray (Muraena clepsydra)",
+        "Jeweled moray (Muraena lentiginosa)",
+        "Tiger reef-eel (Scuticaria tigrina)",
+        "Roosterfish (Nematistius pectoralis)",
+        "Tiger snake eel (Myrichthys tigrinus)",
+        "Pacific snake eel (Ophichthus triseralis)",
+        "Notched-fin snake eel (Quassiremus nothochir)",
+        "Whitespotted boxfish (Ostracion meleagris)",
+        "King angelfish (Holacanthus passer)",
+        "Cortez angelfish (Pomacanthus zonipectus)",
+        "Night sergeant (Abudefduf concolor)",
+        "Panamic sergeant major (Abudefduf troschelii)",
+        "Scissortail chromis (Azurina atrilobata)",
+        "Bumphead damselfish (Microspathodon bairdii)",
+        "Giant damselfish (Microspathodon dorsalis)",
+        "Acapulco damselfish (Stegastes acapulcoensis)",
+        "Beaubrummel (Stegastes flavilatus)",
+        "Blue-barred parrotfish (Scarus ghobban)",
+        "Greenblotch parrotfish (Scarus perrico)",
+        "Ember parrotfish (Scarus rubroviolaceus)",
+        "Black skipjack (Euthynnus lineatus)",
+        "Pacific sierra (Scomberomorus sierra)",
+        "Stone scorpionfish (Scorpaena mystes)",
+        "Pacific mutton hamlet (Alphestes immaculatus)",
+        "Pacific graysby (Cephalopholis colonus)",
+        "Creolefish (Paranthias panamensis)",
+        "Leather bass (Dermatolepis dermatolepis)",
+        "Spotted grouper (Epinephelus analogus)",
+        "Starry grouper (Epinephelus labriformis)",
+        "Pacific goliath grouper (Epinephelus quinquefasciatus)",
+        "Broomtail grouper (Mycteroperca xenarcha)",
+        "Mottled soapfish (Rypticus bicolor)",
+        "Flag serrano (Serranus psittacinus)",
+        "Pacific porgy (Calamus brachysomus)",
+        "Mexican barracuda (Sphyraena ensis)",
+        "Bluestripe pipefish (Doryrhamphus excisus)",
+        "Calico lizardfish (Synodus lacertinus)",
+        "Whitespotted puffer (Arothron hispidus)",
+        "Guineafowl puffer (Arothron meleagris)",
+        "Spotted sharpnose puffer (Canthigaster punctatissima)",
+        "Bullseye puffer (Sphoeroides annulatus)",
+        "Lobed puffer (Sphoeroides lobatus)",
+        "Lucilla's triplefin (Axoclinus lucillae)",
+    ],
+    "Sea turtle": [],
+    "Other": [],
+}
+ALL_SPECIES = [s for species in SPECIES_CATEGORIES.values() for s in species]
 
 # Modern-ish palette (RGB) for tracked features
 FEATURE_COLORS = [
@@ -178,14 +337,14 @@ QGroupBox { border: none; }
 @dataclass
 class TrackedFeature:
     name: str
-    feature_type: str
     init_frame: int
     end_frame: int
     init_type: str              # "point" | "bbox"
     init_coords: list           # [x,y] or [x1,y1,x2,y2]
-    confidence_threshold: float
     color_idx: int = 0
-    behavior: str = "Swimming"
+    count: int = 1
+    species_category: str = ""  # Shark / Ray / Teleost fish / Sea turtle / Other
+    species: str = ""           # specific species name, optional
 
 
 class FeatureStore:
@@ -205,8 +364,8 @@ class FeatureStore:
         self._next_color = 0
 
         # per-frame scene labels (persist until changed)
-        self.env_per_frame: List[Optional[str]] = [None] * total_frames
-        self.substrate_per_frame: List[Optional[str]] = [None] * total_frames
+        self.behavior_per_frame: List[Optional[str]] = [None] * total_frames
+        self.habitat_per_frame: List[Optional[str]] = [None] * total_frames
 
     def add_feature(self, feat: TrackedFeature,
                     masks: Dict[int, np.ndarray],
@@ -233,13 +392,13 @@ class FeatureStore:
                 out.append((i, feat, mask, bbox))
         return out
 
-    def set_env(self, frame_idx: int, label: Optional[str]):
+    def set_behavior(self, frame_idx: int, label: Optional[str]):
         if 0 <= frame_idx < self.total_frames:
-            self.env_per_frame[frame_idx] = label
+            self.behavior_per_frame[frame_idx] = label
 
-    def set_substrate(self, frame_idx: int, label: Optional[str]):
+    def set_habitat(self, frame_idx: int, label: Optional[str]):
         if 0 <= frame_idx < self.total_frames:
-            self.substrate_per_frame[frame_idx] = label
+            self.habitat_per_frame[frame_idx] = label
 
     @staticmethod
     def _compress_timeline(labels: List[Optional[str]]):
@@ -265,22 +424,22 @@ class FeatureStore:
             "video_w": self.video_w,
             "video_h": self.video_h,
             "scene": {
-                "environment_segments": self._compress_timeline(self.env_per_frame),
-                "substrate_segments": self._compress_timeline(self.substrate_per_frame),
+                "behavior_segments": self._compress_timeline(self.behavior_per_frame),
+                "habitat_segments": self._compress_timeline(self.habitat_per_frame),
             },
             "features": [],
         }
         for i, feat in enumerate(self.features):
             data["features"].append({
                 "name": feat.name,
-                "feature_type": feat.feature_type,
                 "init_frame": feat.init_frame,
                 "end_frame": feat.end_frame,
                 "init_type": feat.init_type,
                 "init_coords": feat.init_coords,
-                "confidence_threshold": feat.confidence_threshold,
                 "color_idx": feat.color_idx,
-                "behavior": feat.behavior,
+                "count": feat.count,
+                "species_category": feat.species_category,
+                "species": feat.species,
                 "bboxes": {str(k): list(v) for k, v in self.feature_bboxes[i].items()},
             })
         with open(path, "w") as f:
@@ -301,24 +460,25 @@ class FeatureStore:
         )
 
         scene = data.get("scene", {})
-        for seg in scene.get("environment_segments", []):
+        # Support both new field names and old field names for backward compatibility
+        for seg in scene.get("behavior_segments", scene.get("environment_segments", [])):
             for fi in range(int(seg["start"]), int(seg["end"]) + 1):
-                store.set_env(fi, seg.get("value"))
-        for seg in scene.get("substrate_segments", []):
+                store.set_behavior(fi, seg.get("value"))
+        for seg in scene.get("habitat_segments", scene.get("substrate_segments", [])):
             for fi in range(int(seg["start"]), int(seg["end"]) + 1):
-                store.set_substrate(fi, seg.get("value"))
+                store.set_habitat(fi, seg.get("value"))
 
         for fd in data.get("features", []):
             feat = TrackedFeature(
                 name=fd.get("name", "feature"),
-                feature_type=fd.get("feature_type", "Other"),
                 init_frame=int(fd.get("init_frame", 0)),
                 end_frame=int(fd.get("end_frame", 0)),
                 init_type=fd.get("init_type", "point"),
                 init_coords=fd.get("init_coords", [0, 0]),
-                confidence_threshold=float(fd.get("confidence_threshold", 0.5)),
                 color_idx=int(fd.get("color_idx", 0)),
-                behavior=fd.get("behavior", "Swimming"),
+                count=int(fd.get("count", 1)),
+                species_category=fd.get("species_category", fd.get("feature_type", "")),
+                species=fd.get("species", ""),
             )
             bboxes_raw = fd.get("bboxes", {})
             bboxes: Dict[int, Tuple[int, int, int, int]] = {
@@ -432,15 +592,23 @@ class AnnotationTimeline(QWidget):
             fixed = QSizePolicy.Fixed
 
         self.setSizePolicy(exp, fixed)
-        self.setMinimumHeight(130)
+        self.setMinimumHeight(160)
         self.setMouseTracking(True)
 
-        # Colors for environment segments (soft)
-        self._env_colors = {
+        # Colors for behavior segments — cycle through FEATURE_COLORS palette
+        self._behavior_colors = {
+            opt: QColor(*FEATURE_COLORS[i % len(FEATURE_COLORS)])
+            for i, opt in enumerate(BEHAVIOR_OPTIONS)
+        }
+        self._behavior_colors[None] = QColor(203, 213, 225)
+
+        # Colors for habitat segments
+        self._habitat_colors = {
             "Mangrove": QColor(16, 185, 129),
-            "Reef": QColor(14, 165, 233),
-            "Open Ocean": QColor(245, 158, 11),
-            "Open-Ocean": QColor(245, 158, 11),
+            "Rocky reef": QColor(14, 165, 233),
+            "Sandy bottom": QColor(245, 158, 11),
+            "Gravel": QColor(156, 163, 175),
+            "Mud": QColor(120, 100, 80),
             None: QColor(203, 213, 225),
         }
 
@@ -518,10 +686,11 @@ class AnnotationTimeline(QWidget):
         label_w, x0, x1, w = self._bar_geometry()
         top = 10
         row_h = 22
-        gap = 14
+        gap = 10
 
-        env_y = top
-        animals_y = env_y + row_h + gap
+        behavior_y = top
+        habitat_y = behavior_y + row_h + gap
+        animals_y = habitat_y + row_h + gap
         scrub_y = animals_y + row_h + gap
 
         # Background
@@ -540,40 +709,44 @@ class AnnotationTimeline(QWidget):
             p.setBrush(QColor(255, 255, 255))
             p.drawRoundedRect(x0, y, w, row_h, 6, 6)
 
-        # --- Environment row
-        draw_left_label("Environment", env_y)
-        draw_bar_outline(env_y)
+        def draw_segment_row(row_y, labels, color_dict):
+            draw_bar_outline(row_y)
+            the_segs = FeatureStore._compress_timeline(
+                labels if labels is not None else [None] * self.total_frames
+            )
+            for seg in the_segs:
+                v = seg.get("value", None)
+                c = color_dict.get(v, QColor(203, 213, 225))
+                s = int(seg["start"])
+                e = int(seg["end"])
+                x_s = int(x0 + (s / max(1, self.total_frames)) * w)
+                x_e = int(x0 + ((e + 1) / max(1, self.total_frames)) * w)
+                if x_e <= x_s:
+                    continue
+                p.setPen(Qt.PenStyle.NoPen if _QT6 else Qt.NoPen)
+                p.setBrush(QColor(c.red(), c.green(), c.blue(), 70))
+                p.drawRoundedRect(x_s, row_y + 1, max(1, x_e - x_s), row_h - 2, 6, 6)
+                lbl = v if v is not None else "Unknown"
+                if (x_e - x_s) > 90:
+                    p.setPen(QColor(15, 23, 42))
+                    ff = p.font()
+                    ff.setBold(False)
+                    ff.setPointSize(11)
+                    p.setFont(ff)
+                    p.drawText(x_s + 8, row_y + row_h - 6, lbl)
 
-        env_labels = self.store.env_per_frame if self.store is not None else [None] * self.total_frames
-        segs = FeatureStore._compress_timeline(env_labels)
+        # --- Behavior row
+        draw_left_label("Behavior", behavior_y)
+        behavior_labels = self.store.behavior_per_frame if self.store is not None else None
+        draw_segment_row(behavior_y, behavior_labels, self._behavior_colors)
 
-        for seg in segs:
-            v = seg.get("value", None)
-            c = self._env_colors.get(v, QColor(203, 213, 225))
-            s = int(seg["start"])
-            e = int(seg["end"])
-
-            # Use total_frames for segment boundaries so (e+1) maps cleanly
-            x_s = int(x0 + (s / max(1, self.total_frames)) * w)
-            x_e = int(x0 + ((e + 1) / max(1, self.total_frames)) * w)
-            if x_e <= x_s:
-                continue
-
-            p.setPen(Qt.PenStyle.NoPen if _QT6 else Qt.NoPen)
-            p.setBrush(QColor(c.red(), c.green(), c.blue(), 70))
-            p.drawRoundedRect(x_s, env_y + 1, max(1, x_e - x_s), row_h - 2, 6, 6)
-
-            label = v if v is not None else "Unknown"
-            if (x_e - x_s) > 90:
-                p.setPen(QColor(15, 23, 42))
-                f = p.font()
-                f.setBold(False)
-                f.setPointSize(11)
-                p.setFont(f)
-                p.drawText(x_s + 8, env_y + row_h - 6, label)
+        # --- Habitat row
+        draw_left_label("Habitat", habitat_y)
+        habitat_labels = self.store.habitat_per_frame if self.store is not None else None
+        draw_segment_row(habitat_y, habitat_labels, self._habitat_colors)
 
         # --- Other animals row
-        draw_left_label("Other animals:", animals_y)
+        draw_left_label("Features:", animals_y)
         draw_bar_outline(animals_y)
 
         intervals = []
@@ -615,7 +788,7 @@ class AnnotationTimeline(QWidget):
             p.setBrush(QColor(c.red(), c.green(), c.blue(), 170))
             p.drawRoundedRect(x_s, y, max(2, x_e - x_s), h, 4, 4)
 
-            # Name tag above row (like screenshot)
+            # Name tag above row
             if (x_e - x_s) > 65:
                 p.setPen(QColor(15, 23, 42))
                 f = p.font()
@@ -637,7 +810,7 @@ class AnnotationTimeline(QWidget):
         # Cursor line + knob
         cx = self._frame_to_x(self.current_frame, x0, w)
         p.setPen(QPen(QColor(15, 23, 42), 2))
-        p.drawLine(cx, env_y, cx, scrub_y + row_h)
+        p.drawLine(cx, behavior_y, cx, scrub_y + row_h)
 
         p.setBrush(QColor(15, 23, 42))
         p.setPen(Qt.PenStyle.NoPen if _QT6 else Qt.NoPen)
@@ -721,10 +894,13 @@ class MainWindow(QMainWindow):
             self.store = FeatureStore(store_path, self.fps,
                                       self.total_frames, self.video_w, self.video_h)
 
-        # environment/substrate selection (persist-until-changed)
-        self._current_env = ENV_OPTIONS[0]
-        self._current_substrate = SUBSTRATE_OPTIONS[0]
+        # behavior/habitat selection (persist-until-changed)
+        self._current_behavior = BEHAVIOR_OPTIONS[0]
+        self._current_habitat = HABITAT_OPTIONS[0]
         self._type_counters: Dict[str, int] = {}
+
+        # playback speed
+        self._play_speed = 1.0
 
         # playback timer
         self.timer = QTimer(self)
@@ -778,22 +954,22 @@ class MainWindow(QMainWindow):
         self.video_label.setAlignment(align_flag)
         self.video_label.setMinimumSize(QSize(740, 420))
 
-        # Environment + Substrate bars (below video)
-        self.env_bar, self._env_btns = self._make_segment_bar(
-            "Environment:", ENV_OPTIONS, self._on_env_selected
+        # Behavior + Habitat bars (below video)
+        self.behavior_bar, self._behavior_btns = self._make_segment_bar(
+            "Behavior:", BEHAVIOR_OPTIONS, self._on_behavior_selected
         )
-        self.substrate_bar, self._sub_btns = self._make_segment_bar(
-            "Substrate:", SUBSTRATE_OPTIONS, self._on_substrate_selected
+        self.habitat_bar, self._habitat_btns = self._make_segment_bar(
+            "Habitat:", HABITAT_OPTIONS, self._on_habitat_selected
         )
         # initial highlight
-        self._env_btns[self._current_env].setChecked(True)
-        self._sub_btns[self._current_substrate].setChecked(True)
+        self._behavior_btns[self._current_behavior].setChecked(True)
+        self._habitat_btns[self._current_habitat].setChecked(True)
 
         video_col = QVBoxLayout()
         video_col.setSpacing(10)
         video_col.addWidget(self.video_label, stretch=1)
-        video_col.addWidget(self.env_bar)
-        video_col.addWidget(self.substrate_bar)
+        video_col.addWidget(self.behavior_bar)
+        video_col.addWidget(self.habitat_bar)
 
         video_wrap = QWidget()
         video_wrap.setLayout(video_col)
@@ -829,19 +1005,42 @@ class MainWindow(QMainWindow):
         load_json_btn.setObjectName("Secondary")
         load_json_btn.clicked.connect(self._load_json)
 
-        # Feature type + behavior combos
-        self.type_combo = QComboBox()
-        self.type_combo.addItems(FEATURE_TYPES)
-        self.behavior_combo = QComboBox()
-        self.behavior_combo.addItems(BEHAVIOR_OPTIONS)
+        # Category combo
+        self.category_combo = QComboBox()
+        self.category_combo.addItems(["Shark", "Ray", "Teleost fish", "Sea turtle", "Other"])
 
-        type_row = QHBoxLayout()
-        type_row.addWidget(QLabel("Type:"))
-        type_row.addWidget(self.type_combo, stretch=1)
+        category_row = QHBoxLayout()
+        category_row.addWidget(QLabel("Category:"))
+        category_row.addWidget(self.category_combo, stretch=1)
 
-        beh_row = QHBoxLayout()
-        beh_row.addWidget(QLabel("Behavior:"))
-        beh_row.addWidget(self.behavior_combo, stretch=1)
+        # Species combo (editable with autocomplete)
+        self.species_combo = QComboBox()
+        self.species_combo.setEditable(True)
+        self.species_combo.addItem("")
+        self.species_combo.addItems(SPECIES_CATEGORIES.get("Shark", []))
+        completer = QCompleter(SPECIES_CATEGORIES.get("Shark", ALL_SPECIES))
+        try:
+            completer.setFilterMode(Qt.MatchFlag.MatchContains)
+            completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        except AttributeError:
+            completer.setFilterMode(Qt.MatchContains)
+            completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.species_combo.setCompleter(completer)
+        self.category_combo.currentTextChanged.connect(self._on_category_changed)
+
+        species_row = QHBoxLayout()
+        species_row.addWidget(QLabel("Species:"))
+        species_row.addWidget(self.species_combo, stretch=1)
+
+        # Count spinbox
+        self.count_spin = QSpinBox()
+        self.count_spin.setMinimum(1)
+        self.count_spin.setMaximum(9999)
+        self.count_spin.setValue(1)
+
+        count_row = QHBoxLayout()
+        count_row.addWidget(QLabel("Count:"))
+        count_row.addWidget(self.count_spin, stretch=1)
 
         # Draw bbox toggle button
         self.bbox_btn = QPushButton("Draw Bbox")
@@ -853,8 +1052,9 @@ class MainWindow(QMainWindow):
 
         # Pack into a "card"
         card_layout = QVBoxLayout()
-        card_layout.addLayout(type_row)
-        card_layout.addLayout(beh_row)
+        card_layout.addLayout(category_row)
+        card_layout.addLayout(species_row)
+        card_layout.addLayout(count_row)
         card_layout.addLayout(name_row)
         card_layout.addWidget(self.bbox_btn)
         card_layout.addWidget(QLabel("Annotated Features:"))
@@ -871,7 +1071,7 @@ class MainWindow(QMainWindow):
         card_v.setSpacing(10)
         title = QLabel("Controls")
         title.setObjectName("Title")
-        subtitle = QLabel("Label environment & substrate. Draw bboxes to annotate features on individual frames.")
+        subtitle = QLabel("Label behavior & habitat. Draw bboxes to annotate features on individual frames.")
         subtitle.setObjectName("Subtle")
         card_v.addWidget(title)
         card_v.addWidget(subtitle)
@@ -901,6 +1101,12 @@ class MainWindow(QMainWindow):
         self.frame_lbl = QLabel()
         self.frame_lbl.setObjectName("Subtle")
 
+        # Speed combo
+        self.speed_combo = QComboBox()
+        self.speed_combo.addItems(["0.5x", "1x", "2x", "4x"])
+        self.speed_combo.setCurrentText("1x")
+        self.speed_combo.currentTextChanged.connect(self._on_speed_changed)
+
         ctrls = QHBoxLayout()
         ctrls.setSpacing(8)
         ctrls.addWidget(self.back_btn)
@@ -908,10 +1114,20 @@ class MainWindow(QMainWindow):
         ctrls.addWidget(self.fwd_btn)
         ctrls.addWidget(self.frame_lbl)
         ctrls.addStretch(1)
+        ctrls.addWidget(QLabel("Speed:"))
+        ctrls.addWidget(self.speed_combo)
 
         # ---- bottom timeline scrubber ----
         self.timeline = AnnotationTimeline(self.store, self.fps, self.total_frames)
         self.timeline.frameSelected.connect(self.seek_to)
+
+        # ---- keyboard shortcuts for frame stepping ----
+        QShortcut(
+            QKeySequence(Qt.Key.Key_Left if _QT6 else Qt.Key_Left), self
+        ).activated.connect(lambda: self.seek_to(self.current_frame_idx - 1))
+        QShortcut(
+            QKeySequence(Qt.Key.Key_Right if _QT6 else Qt.Key_Right), self
+        ).activated.connect(lambda: self.seek_to(self.current_frame_idx + 1))
 
         # ---- assemble ----
         top = QHBoxLayout()
@@ -945,33 +1161,40 @@ class MainWindow(QMainWindow):
         if abs(x2 - x1) < 5 or abs(y2 - y1) < 5:
             return
 
-        ftype = self.type_combo.currentText() or "Other"
+        species_category = self.category_combo.currentText() or "Other"
+        species = self.species_combo.currentText().strip()
+        count = self.count_spin.value()
         name = (self.name_edit.text() or "").strip()
         if not name:
-            n = self._type_counters.get(ftype, 1)
-            name = f"{ftype.lower()}_{n}"
-            self._type_counters[ftype] = n + 1
+            n = self._type_counters.get(species_category, 1)
+            name = f"{species_category.lower().replace(' ', '_')}_{n}"
+            self._type_counters[species_category] = n + 1
             self.name_edit.setText(name)
 
         fidx = self.current_frame_idx
         feat = TrackedFeature(
             name=name,
-            feature_type=ftype,
             init_frame=fidx,
             end_frame=fidx,
             init_type="bbox",
             init_coords=[x1, y1, x2, y2],
-            confidence_threshold=0.0,
-            behavior=self.behavior_combo.currentText() or "Swimming",
+            count=count,
+            species_category=species_category,
+            species=species,
         )
         self.store.add_feature(feat, {}, {fidx: (x1, y1, x2, y2)})
         self._refresh_features()
         self._display_frame(fidx)
         if hasattr(self, "timeline"):
             self.timeline.update()
-        self.statusBar().showMessage(
-            f"Added {ftype} '{name}' on frame {fidx}."
-        )
+        if species:
+            self.statusBar().showMessage(
+                f"Added {species_category} ({species}) ×{count} '{name}' on frame {fidx}."
+            )
+        else:
+            self.statusBar().showMessage(
+                f"Added {species_category} ×{count} '{name}' on frame {fidx}."
+            )
         # clear name field so next annotation gets a fresh auto-name
         self.name_edit.clear()
 
@@ -990,44 +1213,66 @@ class MainWindow(QMainWindow):
         fy = max(0, min(int(y * self.video_h / ph), self.video_h - 1))
         return (fx, fy)
 
-    def _on_env_selected(self, label: str):
-        self._current_env = label
-        self.store.set_env(self.current_frame_idx, label)
+    def _on_behavior_selected(self, label: str):
+        self._current_behavior = label
+        self.store.set_behavior(self.current_frame_idx, label)
         if hasattr(self, "timeline"):
             self.timeline.update()
-        self.statusBar().showMessage(f"Environment: {label}")
+        self.statusBar().showMessage(f"Behavior: {label}")
 
-    def _on_substrate_selected(self, label: str):
-        self._current_substrate = label
-        self.store.set_substrate(self.current_frame_idx, label)
+    def _on_habitat_selected(self, label: str):
+        self._current_habitat = label
+        self.store.set_habitat(self.current_frame_idx, label)
         if hasattr(self, "timeline"):
             self.timeline.update()
-        self.statusBar().showMessage(f"Substrate: {label}")
+        self.statusBar().showMessage(f"Habitat: {label}")
+
+    def _on_category_changed(self, category: str):
+        self.species_combo.clear()
+        self.species_combo.addItem("")  # blank = no species selected
+        species_list = SPECIES_CATEGORIES.get(category, [])
+        if not species_list:
+            self.species_combo.addItems(ALL_SPECIES)
+        else:
+            self.species_combo.addItems(species_list)
+        # reset completer
+        completer = QCompleter(SPECIES_CATEGORIES.get(category, ALL_SPECIES))
+        try:
+            completer.setFilterMode(Qt.MatchFlag.MatchContains)
+            completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        except AttributeError:
+            completer.setFilterMode(Qt.MatchContains)
+            completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.species_combo.setCompleter(completer)
 
     def _ensure_scene_labels(self, idx: int):
         # Persist-until-changed behavior: if current frame has no label, inherit current selection.
-        if self.store.env_per_frame[idx] is None:
-            self.store.set_env(idx, self._current_env)
+        if self.store.behavior_per_frame[idx] is None:
+            self.store.set_behavior(idx, self._current_behavior)
         else:
-            self._current_env = self.store.env_per_frame[idx]  # keep UI consistent
+            self._current_behavior = self.store.behavior_per_frame[idx]  # keep UI consistent
 
-        if self.store.substrate_per_frame[idx] is None:
-            self.store.set_substrate(idx, self._current_substrate)
+        if self.store.habitat_per_frame[idx] is None:
+            self.store.set_habitat(idx, self._current_habitat)
         else:
-            self._current_substrate = self.store.substrate_per_frame[idx]
+            self._current_habitat = self.store.habitat_per_frame[idx]
 
         # Sync highlight state
-        if self._current_env in self._env_btns:
-            self._env_btns[self._current_env].setChecked(True)
-        if self._current_substrate in self._sub_btns:
-            self._sub_btns[self._current_substrate].setChecked(True)
+        if self._current_behavior in self._behavior_btns:
+            self._behavior_btns[self._current_behavior].setChecked(True)
+        if self._current_habitat in self._habitat_btns:
+            self._habitat_btns[self._current_habitat].setChecked(True)
 
     # ------------------------------------------------------- feature list
     def _refresh_features(self):
         self.feat_list.clear()
-        for i, f in enumerate(self.store.features):
-            c = FEATURE_COLORS[f.color_idx % len(FEATURE_COLORS)]
-            it = QListWidgetItem(f"{f.feature_type} • {f.name}  [{f.behavior}]  (f{f.init_frame}–f{f.end_frame})")
+        for i, feat in enumerate(self.store.features):
+            c = FEATURE_COLORS[feat.color_idx % len(FEATURE_COLORS)]
+            label = feat.species_category
+            if feat.species:
+                label = f"{feat.species_category}: {feat.species}"
+            display = f"{label}  ×{feat.count}  [f{feat.init_frame}]  {feat.name}"
+            it = QListWidgetItem(display)
             user_role = Qt.ItemDataRole.UserRole if _QT6 else Qt.UserRole
             it.setData(user_role, i)
             it.setForeground(QColor(*c))
@@ -1068,11 +1313,11 @@ class MainWindow(QMainWindow):
         try:
             loaded = FeatureStore.load_json(p)
             # Merge scene labels and features into current store
-            for fi in range(min(len(loaded.env_per_frame), self.store.total_frames)):
-                if loaded.env_per_frame[fi] is not None:
-                    self.store.env_per_frame[fi] = loaded.env_per_frame[fi]
-                if loaded.substrate_per_frame[fi] is not None:
-                    self.store.substrate_per_frame[fi] = loaded.substrate_per_frame[fi]
+            for fi in range(min(len(loaded.behavior_per_frame), self.store.total_frames)):
+                if loaded.behavior_per_frame[fi] is not None:
+                    self.store.behavior_per_frame[fi] = loaded.behavior_per_frame[fi]
+                if loaded.habitat_per_frame[fi] is not None:
+                    self.store.habitat_per_frame[fi] = loaded.habitat_per_frame[fi]
             for feat, masks, bboxes in zip(loaded.features, loaded.feature_masks, loaded.feature_bboxes):
                 self.store.features.append(feat)
                 self.store.feature_masks.append(masks)
@@ -1105,7 +1350,17 @@ class MainWindow(QMainWindow):
     def toggle_play(self):
         self.playing = not self.playing
         self.play_btn.setText("Pause" if self.playing else "Play")
-        self.timer.start() if self.playing else self.timer.stop()
+        if self.playing:
+            interval = max(1, int(33 / self._play_speed))
+            self.timer.start(interval)
+        else:
+            self.timer.stop()
+
+    def _on_speed_changed(self, text: str):
+        self._play_speed = float(text.replace('x', ''))
+        if self.timer.isActive():
+            interval = max(1, int(33 / self._play_speed))
+            self.timer.setInterval(interval)
 
     def _tick(self):
         if self.current_frame_idx >= self.total_frames - 1:
@@ -1125,7 +1380,7 @@ class MainWindow(QMainWindow):
             self.timeline.set_current_frame(idx)
 
         self.frame_lbl.setText(
-            f"Frame {idx}/{self.total_frames - 1} • {self._current_env} • {self._current_substrate}"
+            f"Frame {idx}/{self.total_frames - 1} • {self._current_behavior} • {self._current_habitat}"
         )
 
     # -------------------------------------------------------------- display
@@ -1147,12 +1402,17 @@ class MainWindow(QMainWindow):
         # overlay committed features (bboxes only — no SAM2 masks)
         for _, feat, mask, bbox in self.store.features_at(idx):
             bgr = FEATURE_COLORS[feat.color_idx % len(FEATURE_COLORS)][::-1]
-            self._draw_mask(preview, mask, bgr, f"{feat.feature_type}: {feat.name}", bbox)
+            feat_label = feat.species_category
+            if feat.species:
+                feat_label = f"{feat.species_category}: {feat.species}"
+            if feat.count > 1:
+                feat_label = f"{feat_label} ×{feat.count}"
+            self._draw_mask(preview, mask, bgr, feat_label, bbox)
 
         # scene text (anti-aliased)
-        env = self.store.env_per_frame[idx] or self._current_env
-        sub = self.store.substrate_per_frame[idx] or self._current_substrate
-        text = f"{env} • {sub}"
+        beh = self.store.behavior_per_frame[idx] or self._current_behavior
+        hab = self.store.habitat_per_frame[idx] or self._current_habitat
+        text = f"{beh} • {hab}"
         cv2.putText(preview, text, (14, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 4, cv2.LINE_AA)
         cv2.putText(preview, text, (14, 30),
@@ -1221,9 +1481,11 @@ class MainWindow(QMainWindow):
 
         # ── palette matching the app UI ───────────────────────────────────
         HAB_COLORS = {
-            "Mangrove":   "#10B981",
-            "Reef":       "#0EA5E9",
-            "Open Ocean": "#F59E0B",
+            "Mangrove":     "#10B981",
+            "Rocky reef":   "#0EA5E9",
+            "Sandy bottom": "#F59E0B",
+            "Gravel":       "#9CA3AF",
+            "Mud":          "#78644A",
         }
         DEFAULT_CLR = "#94A3B8"
 
@@ -1240,18 +1502,18 @@ class MainWindow(QMainWindow):
             ax.yaxis.grid(True, color="#E2E8F0", linewidth=0.8, zorder=0)
             ax.set_axisbelow(True)
 
-        env_counts = Counter(lab for lab in store.env_per_frame if lab)
+        hab_counts = Counter(lab for lab in store.habitat_per_frame if lab)
 
         # ── 1. Time spent in each habitat ─────────────────────────────────
-        if env_counts:
-            envs = list(env_counts.keys())
-            secs = [env_counts[e] / fps for e in envs]
-            cols = [HAB_COLORS.get(e, DEFAULT_CLR) for e in envs]
+        if hab_counts:
+            habs = list(hab_counts.keys())
+            secs = [hab_counts[h] / fps for h in habs]
+            cols = [HAB_COLORS.get(h, DEFAULT_CLR) for h in habs]
             peak = max(secs)
 
             fig, ax = plt.subplots(figsize=(8, 5))
             fig.patch.set_facecolor("#FFFFFF")
-            bars = ax.bar(envs, secs, color=cols, width=0.45,
+            bars = ax.bar(habs, secs, color=cols, width=0.45,
                           edgecolor="#FFFFFF", linewidth=1.8, zorder=3)
             for bar, s in zip(bars, secs):
                 ax.text(bar.get_x() + bar.get_width() / 2,
@@ -1269,24 +1531,24 @@ class MainWindow(QMainWindow):
         # ── 2. Animal sightings per minute by habitat ─────────────────────
         hab_sightings = Counter()
         for feat in store.features:
-            habs = [store.env_per_frame[f]
-                    for f in range(feat.init_frame, min(feat.end_frame + 1, total))
-                    if store.env_per_frame[f]]
-            if habs:
-                hab_sightings[Counter(habs).most_common(1)[0][0]] += 1
+            feat_habs = [store.habitat_per_frame[f]
+                         for f in range(feat.init_frame, min(feat.end_frame + 1, total))
+                         if store.habitat_per_frame[f]]
+            if feat_habs:
+                hab_sightings[Counter(feat_habs).most_common(1)[0][0]] += feat.count
 
-        all_envs = sorted(set(list(env_counts.keys()) + list(hab_sightings.keys())))
-        if all_envs:
+        all_habs = sorted(set(list(hab_counts.keys()) + list(hab_sightings.keys())))
+        if all_habs:
             rates = []
-            for e in all_envs:
-                mins = env_counts.get(e, 0) / fps / 60.0
-                rates.append(hab_sightings.get(e, 0) / mins if mins > 0 else 0.0)
-            cols = [HAB_COLORS.get(e, DEFAULT_CLR) for e in all_envs]
+            for h in all_habs:
+                mins = hab_counts.get(h, 0) / fps / 60.0
+                rates.append(hab_sightings.get(h, 0) / mins if mins > 0 else 0.0)
+            cols = [HAB_COLORS.get(h, DEFAULT_CLR) for h in all_habs]
             peak = max(rates) if rates else 0.0
 
             fig, ax = plt.subplots(figsize=(8, 5))
             fig.patch.set_facecolor("#FFFFFF")
-            bars = ax.bar(all_envs, rates, color=cols, width=0.45,
+            bars = ax.bar(all_habs, rates, color=cols, width=0.45,
                           edgecolor="#FFFFFF", linewidth=1.8, zorder=3)
             for bar, r in zip(bars, rates):
                 ax.text(bar.get_x() + bar.get_width() / 2,
@@ -1302,42 +1564,42 @@ class MainWindow(QMainWindow):
             plt.close(fig)
             saved.append(out)
 
-        # ── 3. Behavior distribution by habitat ───────────────────────────
-        beh_hab = defaultdict(Counter)
+        # ── 3. Species category distribution by habitat ───────────────────
+        cat_hab = defaultdict(Counter)
         for feat in store.features:
-            habs = [store.env_per_frame[f]
-                    for f in range(feat.init_frame, min(feat.end_frame + 1, total))
-                    if store.env_per_frame[f]]
-            if habs:
-                dom = Counter(habs).most_common(1)[0][0]
-                beh_hab[feat.behavior][dom] += 1
+            feat_habs = [store.habitat_per_frame[f]
+                         for f in range(feat.init_frame, min(feat.end_frame + 1, total))
+                         if store.habitat_per_frame[f]]
+            if feat_habs:
+                dom = Counter(feat_habs).most_common(1)[0][0]
+                cat_hab[feat.species_category or "Other"][dom] += feat.count
 
-        behaviors = sorted(beh_hab.keys())
-        plot_habs = sorted(set(h for c in beh_hab.values() for h in c))
+        categories = sorted(cat_hab.keys())
+        plot_habs = sorted(set(h for cnt in cat_hab.values() for h in cnt))
 
-        if behaviors and plot_habs:
+        if categories and plot_habs:
             n_habs  = len(plot_habs)
             group_w = 0.65
             bar_w   = group_w / max(n_habs, 1)
 
             fig, ax = plt.subplots(figsize=(9, 5))
             fig.patch.set_facecolor("#FFFFFF")
-            x = np.arange(len(behaviors))
+            x = np.arange(len(categories))
             for j, hab in enumerate(plot_habs):
-                counts = [beh_hab[b].get(hab, 0) for b in behaviors]
+                counts = [cat_hab[c].get(hab, 0) for c in categories]
                 offset = (j - n_habs / 2 + 0.5) * bar_w
                 ax.bar(x + offset, counts, width=bar_w * 0.88,
                        label=hab, color=HAB_COLORS.get(hab, DEFAULT_CLR),
                        edgecolor="#FFFFFF", linewidth=1.5, zorder=3)
             ax.set_xticks(x)
-            ax.set_xticklabels([b.capitalize() for b in behaviors], fontsize=11)
+            ax.set_xticklabels(categories, fontsize=10, rotation=15, ha="right")
             leg = ax.legend(title="Habitat", fontsize=9, title_fontsize=10,
                             framealpha=0.95, edgecolor="#E2E8F0")
             leg.get_frame().set_linewidth(0.8)
-            _style(ax, "Behavior Distribution by Habitat",
-                   "Behavior", "Number of Animals")
+            _style(ax, "Species Category Distribution by Habitat",
+                   "Category", "Number of Animals")
             plt.tight_layout(pad=1.8)
-            out = f"{base_path}_3_behavior_habitat.png"
+            out = f"{base_path}_3_category_habitat.png"
             fig.savefig(out, dpi=200, bbox_inches="tight", facecolor="#FFFFFF")
             plt.close(fig)
             saved.append(out)
@@ -1352,11 +1614,11 @@ class MainWindow(QMainWindow):
         window_s      = max(15.0, min(60.0, total_secs / 8))
         window_frames = max(1, min(int(window_s * fps), total))
 
-        # Count new feature appearances per frame
+        # Count new feature appearances per frame (weighted by count)
         new_sightings = np.zeros(total, dtype=float)
         for feat in store.features:
             if 0 <= feat.init_frame < total:
-                new_sightings[feat.init_frame] += 1
+                new_sightings[feat.init_frame] += feat.count
 
         # Rolling sum → rate per minute
         kernel       = np.ones(window_frames)
@@ -1370,7 +1632,7 @@ class MainWindow(QMainWindow):
         fig.patch.set_facecolor("#FFFFFF")
 
         # ── habitat background shading ──
-        segs = FeatureStore._compress_timeline(store.env_per_frame)
+        segs = FeatureStore._compress_timeline(store.habitat_per_frame)
         for seg in segs:
             v = seg.get("value")
             if v is None:
@@ -1461,13 +1723,21 @@ class MainWindow(QMainWindow):
         w = cv2.VideoWriter(out_path, fourcc, self.fps, (self.video_w, self.video_h))
 
         def draw_scene(frame, fidx):
-            env = self.store.env_per_frame[fidx] or self._current_env
-            sub = self.store.substrate_per_frame[fidx] or self._current_substrate
-            text = f"{env} • {sub}"
+            beh = self.store.behavior_per_frame[fidx] or self._current_behavior
+            hab = self.store.habitat_per_frame[fidx] or self._current_habitat
+            text = f"{beh} • {hab}"
             cv2.putText(frame, text, (14, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 4, cv2.LINE_AA)
             cv2.putText(frame, text, (14, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2, cv2.LINE_AA)
+
+        def feat_label(feat):
+            lbl = feat.species_category
+            if feat.species:
+                lbl = f"{feat.species_category}: {feat.species}"
+            if feat.count > 1:
+                lbl = f"{lbl} x{feat.count}"
+            return lbl
 
         if self.is_frame_dir:
             for fidx in range(self.total_frames):
@@ -1476,7 +1746,7 @@ class MainWindow(QMainWindow):
                     continue
                 for _, feat, mask, bbox in self.store.features_at(fidx):
                     bgr = FEATURE_COLORS[feat.color_idx % len(FEATURE_COLORS)][::-1]
-                    self._draw_mask(frame, mask, bgr, f"{feat.feature_type}: {feat.name}", bbox)
+                    self._draw_mask(frame, mask, bgr, feat_label(feat), bbox)
                 draw_scene(frame, fidx)
                 w.write(frame)
         else:
@@ -1488,7 +1758,7 @@ class MainWindow(QMainWindow):
                     break
                 for _, feat, mask, bbox in self.store.features_at(fidx):
                     bgr = FEATURE_COLORS[feat.color_idx % len(FEATURE_COLORS)][::-1]
-                    self._draw_mask(frame, mask, bgr, f"{feat.feature_type}: {feat.name}", bbox)
+                    self._draw_mask(frame, mask, bgr, feat_label(feat), bbox)
                 draw_scene(frame, fidx)
                 w.write(frame)
                 fidx += 1
