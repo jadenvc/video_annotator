@@ -911,15 +911,11 @@ class MainWindow(QMainWindow):
         self.seek_to(0)
 
     # ------------------------------------------------------------------ UI
-    def _make_segment_bar(self, title: str, options: List[str], on_select):
-        row = QWidget()
-        hl = QHBoxLayout()
-        hl.setContentsMargins(0, 0, 0, 0)
-        hl.setSpacing(8)
-
-        lab = QLabel(title)
-        lab.setObjectName("BarTitle")
-        hl.addWidget(lab)
+    def _make_segment_bar(self, title: str, options: List[str], on_select, rows: int = 1):
+        container = QWidget()
+        outer = QVBoxLayout()
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(4)
 
         try:
             from PyQt6.QtWidgets import QButtonGroup
@@ -930,19 +926,39 @@ class MainWindow(QMainWindow):
         group.setExclusive(True)
         btns = {}
 
-        for opt in options[:10]:
-            b = QToolButton()
-            b.setText(opt)
-            b.setCheckable(True)
-            b.setProperty("segmented", True)
-            b.clicked.connect(lambda checked, t=opt: on_select(t))
-            group.addButton(b)
-            btns[opt] = b
-            hl.addWidget(b)
+        # Split options across rows evenly
+        import math
+        per_row = math.ceil(len(options) / rows)
+        chunks = [options[i:i+per_row] for i in range(0, len(options), per_row)]
 
-        hl.addStretch(1)
-        row.setLayout(hl)
-        return row, btns
+        for r, chunk in enumerate(chunks):
+            hl = QHBoxLayout()
+            hl.setContentsMargins(0, 0, 0, 0)
+            hl.setSpacing(6)
+            if r == 0:
+                lab = QLabel(title)
+                lab.setObjectName("BarTitle")
+                hl.addWidget(lab)
+            else:
+                spacer = QLabel("")
+                spacer.setFixedWidth(60)
+                hl.addWidget(spacer)
+            for opt in chunk:
+                b = QToolButton()
+                b.setText(opt)
+                b.setCheckable(True)
+                b.setProperty("segmented", True)
+                b.clicked.connect(lambda checked, t=opt: on_select(t))
+                group.addButton(b)
+                btns[opt] = b
+                hl.addWidget(b)
+            hl.addStretch(1)
+            row_w = QWidget()
+            row_w.setLayout(hl)
+            outer.addWidget(row_w)
+
+        container.setLayout(outer)
+        return container, btns
 
     def _build_ui(self):
         central = QWidget()
@@ -956,7 +972,7 @@ class MainWindow(QMainWindow):
 
         # Behavior + Habitat bars (below video)
         self.behavior_bar, self._behavior_btns = self._make_segment_bar(
-            "Behavior:", BEHAVIOR_OPTIONS, self._on_behavior_selected
+            "Behavior:", BEHAVIOR_OPTIONS, self._on_behavior_selected, rows=2
         )
         self.habitat_bar, self._habitat_btns = self._make_segment_bar(
             "Habitat:", HABITAT_OPTIONS, self._on_habitat_selected
@@ -977,14 +993,15 @@ class MainWindow(QMainWindow):
         # -------------------------------- right panel (feature list — read-only)
         # feature list (populated from JSON if available; cannot add without tracking)
         self.feat_list = QListWidget()
+        self.feat_list.currentItemChanged.connect(self._on_feature_selected)
 
         fa = QHBoxLayout()
         del_btn = QPushButton("Delete")
         del_btn.setObjectName("Secondary")
         del_btn.clicked.connect(self._delete_feature)
-        ren_btn = QPushButton("Rename")
+        ren_btn = QPushButton("Update")
         ren_btn.setObjectName("Secondary")
-        ren_btn.clicked.connect(self._rename_feature)
+        ren_btn.clicked.connect(self._update_feature)
         fa.addWidget(del_btn)
         fa.addWidget(ren_btn)
 
@@ -1214,15 +1231,30 @@ class MainWindow(QMainWindow):
         return (fx, fy)
 
     def _on_behavior_selected(self, label: str):
+        old = self.store.behavior_per_frame[self.current_frame_idx]
         self._current_behavior = label
         self.store.set_behavior(self.current_frame_idx, label)
+        # Propagate forward through frames that had the old label (or were unset)
+        for i in range(self.current_frame_idx + 1, self.store.total_frames):
+            v = self.store.behavior_per_frame[i]
+            if v is None or v == old:
+                self.store.set_behavior(i, label)
+            else:
+                break
         if hasattr(self, "timeline"):
             self.timeline.update()
         self.statusBar().showMessage(f"Behavior: {label}")
 
     def _on_habitat_selected(self, label: str):
+        old = self.store.habitat_per_frame[self.current_frame_idx]
         self._current_habitat = label
         self.store.set_habitat(self.current_frame_idx, label)
+        for i in range(self.current_frame_idx + 1, self.store.total_frames):
+            v = self.store.habitat_per_frame[i]
+            if v is None or v == old:
+                self.store.set_habitat(i, label)
+            else:
+                break
         if hasattr(self, "timeline"):
             self.timeline.update()
         self.statusBar().showMessage(f"Habitat: {label}")
@@ -1291,19 +1323,49 @@ class MainWindow(QMainWindow):
             if hasattr(self, "timeline"):
                 self.timeline.update()
 
-    def _rename_feature(self):
+    def _on_feature_selected(self, current, previous):
+        """Populate edit fields when a feature is selected in the list."""
+        if current is None:
+            return
+        user_role = Qt.ItemDataRole.UserRole if _QT6 else Qt.UserRole
+        idx = current.data(user_role)
+        if idx is None or not (0 <= idx < len(self.store.features)):
+            return
+        feat = self.store.features[idx]
+        self.name_edit.setText(feat.name)
+        self.count_spin.setValue(feat.count)
+        # Set category combo
+        cat_idx = self.category_combo.findText(feat.species_category)
+        if cat_idx >= 0:
+            self.category_combo.setCurrentIndex(cat_idx)
+        # Set species combo (after category filter is applied)
+        sp_idx = self.species_combo.findText(feat.species)
+        if sp_idx >= 0:
+            self.species_combo.setCurrentIndex(sp_idx)
+        else:
+            self.species_combo.setEditText(feat.species)
+
+    def _update_feature(self):
+        """Save name/species/count changes back to the selected feature."""
         it = self.feat_list.currentItem()
         if it is None:
             return
         user_role = Qt.ItemDataRole.UserRole if _QT6 else Qt.UserRole
         idx = it.data(user_role)
+        if idx is None or not (0 <= int(idx) < len(self.store.features)):
+            return
+        feat = self.store.features[int(idx)]
         name = (self.name_edit.text() or "").strip()
-        if idx is not None and name and 0 <= idx < len(self.store.features):
-            self.store.features[idx].name = name
-            self._refresh_features()
-            self._display_frame(self.current_frame_idx)
-            if hasattr(self, "timeline"):
-                self.timeline.update()
+        if name:
+            feat.name = name
+        feat.species_category = self.category_combo.currentText()
+        feat.species = self.species_combo.currentText().strip()
+        feat.count = self.count_spin.value()
+        self._refresh_features()
+        self._display_frame(self.current_frame_idx)
+        if hasattr(self, "timeline"):
+            self.timeline.update()
+        self.statusBar().showMessage(f"Updated '{feat.name}'.")
 
     def _load_json(self):
         p, _ = QFileDialog.getOpenFileName(
