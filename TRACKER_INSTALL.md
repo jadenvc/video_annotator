@@ -84,6 +84,9 @@ Expected output:
 ### Basic Usage
 
 ```bash
+# Run the bundled shark example
+./run_shark_example.sh
+
 # Extract frames from a video
 ./extract_frames.sh my_clip.mp4
 

@@ -19,6 +19,7 @@ Usage:
 
 import sys
 import os
+import re
 import json
 import argparse
 import shutil
@@ -73,10 +74,18 @@ HABITAT_OPTIONS = ["Mangrove", "Rocky reef", "Sandy bottom", "Gravel", "Mud"]
 
 SPECIES_CATEGORIES = {
     "Shark": [
+        # Species
         "Lemon shark (Negaprion brevirostris)",
         "Pacific nurse shark (Ginglymostoma unami)",
+        # Genus
+        "Ginglymostoma sp.",
+        "Negaprion sp.",
+        # Family
+        "Carcharhinidae",
+        "Ginglymostomatidae",
     ],
     "Ray": [
+        # Species
         "Longtail stingray (Hypanus longus)",
         "Pacific chupare stingray (Styracura pacifica)",
         "Longtail butterfly ray (Gymnura crebipunctata)",
@@ -87,8 +96,27 @@ SPECIES_CATEGORIES = {
         "Pacific cownose ray (Rhinoptera steindachneri)",
         "Leopard round ray (Urobatis pardalis)",
         "Chilean round ray (Urotrygon chilensis)",
+        # Genus
+        "Aetobatus sp.",
+        "Gymnura sp.",
+        "Hypanus sp.",
+        "Mobula sp.",
+        "Pseudobatos sp.",
+        "Rhinoptera sp.",
+        "Styracura sp.",
+        "Urobatis sp.",
+        "Urotrygon sp.",
+        # Family
+        "Dasyatidae",
+        "Gymnuridae",
+        "Mobulidae",
+        "Myliobatidae",
+        "Rhinobatidae",
+        "Rhinopteridae",
+        "Urotrygonidae",
     ],
     "Teleost fish": [
+        # Species
         "Convict surgeonfish (Acanthurus triostegus)",
         "Yellowfin surgeonfish (Acanthurus xanthopterus)",
         "Razor surgeonfish (Prionurus laticlavius)",
@@ -217,8 +245,155 @@ SPECIES_CATEGORIES = {
         "Bullseye puffer (Sphoeroides annulatus)",
         "Lobed puffer (Sphoeroides lobatus)",
         "Lucilla's triplefin (Axoclinus lucillae)",
+        # Genus
+        "Abudefduf sp.",
+        "Acanthemblemaria sp.",
+        "Acanthurus sp.",
+        "Alectis sp.",
+        "Alphestes sp.",
+        "Aluterus sp.",
+        "Anisotremus sp.",
+        "Apogon sp.",
+        "Arothron sp.",
+        "Aulostomus sp.",
+        "Axoclinus sp.",
+        "Azurina sp.",
+        "Balistes sp.",
+        "Bodianus sp.",
+        "Bothus sp.",
+        "Calamus sp.",
+        "Canthigaster sp.",
+        "Caranx sp.",
+        "Centropomus sp.",
+        "Cephalopholis sp.",
+        "Chaenopsis sp.",
+        "Chaetodipterus sp.",
+        "Chaetodon sp.",
+        "Chilomycterus sp.",
+        "Cirrhitichthys sp.",
+        "Cirrhitus sp.",
+        "Coryphaena sp.",
+        "Coryphopterus sp.",
+        "Dermatolepis sp.",
+        "Diodon sp.",
+        "Doryrhamphus sp.",
+        "Echidna sp.",
+        "Elacatinus sp.",
+        "Elagatis sp.",
+        "Elops sp.",
+        "Epinephelus sp.",
+        "Eucinostomus sp.",
+        "Euthynnus sp.",
+        "Fistularia sp.",
+        "Gerres sp.",
+        "Gnathanodon sp.",
+        "Gymnomuraena sp.",
+        "Gymnothorax sp.",
+        "Haemulon sp.",
+        "Halichoeres sp.",
+        "Holacanthus sp.",
+        "Hoplopagrus sp.",
+        "Iniistius sp.",
+        "Johnrandallia sp.",
+        "Kyphosus sp.",
+        "Lutjanus sp.",
+        "Malacanthus sp.",
+        "Malacoctenus sp.",
+        "Microlepidotus sp.",
+        "Microspathodon sp.",
+        "Mugil sp.",
+        "Mulloidichthys sp.",
+        "Muraena sp.",
+        "Myrichthys sp.",
+        "Mycteroperca sp.",
+        "Myripristis sp.",
+        "Nematistius sp.",
+        "Novaculichthys sp.",
+        "Ophioblennius sp.",
+        "Ophichthus sp.",
+        "Ostracion sp.",
+        "Paranthias sp.",
+        "Plagiotremus sp.",
+        "Pomacanthus sp.",
+        "Prionurus sp.",
+        "Pseudobalistes sp.",
+        "Pseudupeneus sp.",
+        "Quassiremus sp.",
+        "Rypticus sp.",
+        "Sargocentron sp.",
+        "Scarus sp.",
+        "Scomberomorus sp.",
+        "Scorpaena sp.",
+        "Scuticaria sp.",
+        "Seriola sp.",
+        "Serranus sp.",
+        "Sphoeroides sp.",
+        "Sphyraena sp.",
+        "Stegastes sp.",
+        "Sufflamen sp.",
+        "Synodus sp.",
+        "Thalassoma sp.",
+        "Trachinotus sp.",
+        "Tylosurus sp.",
+        # Family
+        "Acanthuridae",
+        "Apogonidae",
+        "Aulostomidae",
+        "Balistidae",
+        "Belonidae",
+        "Blenniidae",
+        "Bothidae",
+        "Carangidae",
+        "Centropomidae",
+        "Chaenopsidae",
+        "Chaetodontidae",
+        "Cirrhitidae",
+        "Coryphaenidae",
+        "Diodontidae",
+        "Elopidae",
+        "Ephippidae",
+        "Fistulariidae",
+        "Gerreidae",
+        "Gobiidae",
+        "Haemulidae",
+        "Holocentridae",
+        "Kyphosidae",
+        "Labridae",
+        "Labrisomidae",
+        "Lutjanidae",
+        "Malacanthidae",
+        "Monacanthidae",
+        "Mugilidae",
+        "Mullidae",
+        "Muraenidae",
+        "Nematistiidae",
+        "Ophichthidae",
+        "Ostraciidae",
+        "Pomacanthidae",
+        "Pomacentridae",
+        "Scaridae",
+        "Scombridae",
+        "Scorpaenidae",
+        "Serranidae",
+        "Sparidae",
+        "Sphyraenidae",
+        "Syngnathidae",
+        "Synodontidae",
+        "Tetraodontidae",
+        "Tripterygiidae",
     ],
-    "Sea turtle": [],
+    "Sea turtle": [
+        # Species
+        "Hawksbill sea turtle (Eretmochelys imbricata)",
+        "Olive ridley sea turtle (Lepidochelys olivacea)",
+        "Green sea turtle (Chelonia mydas)",
+        # Genus
+        "Chelonia sp.",
+        "Eretmochelys sp.",
+        "Lepidochelys sp.",
+        # Family
+        "Cheloniidae",
+    ],
     "Other": [],
 }
 ALL_SPECIES = [s for species in SPECIES_CATEGORIES.values() for s in species]
@@ -883,6 +1058,7 @@ class MainWindow(QMainWindow):
 
         self.current_frame_idx = 0
         self.playing = False
+        self._labeling = True  # False = navigate-only, no label writes
 
         # state — either use preloaded store or create fresh one
         store_path = store_video_path or video_path
@@ -1015,6 +1191,12 @@ class MainWindow(QMainWindow):
         # export
         exp_btn = QPushButton("Export Video")
         exp_btn.clicked.connect(self._export_video)
+        plots_btn = QPushButton("Export Plots")
+        plots_btn.setObjectName("Secondary")
+        plots_btn.clicked.connect(self._export_plots_only)
+        excel_btn = QPushButton("Export Excel")
+        excel_btn.setObjectName("Secondary")
+        excel_btn.clicked.connect(self._export_excel)
         json_btn = QPushButton("Save JSON")
         json_btn.setObjectName("Secondary")
         json_btn.clicked.connect(self._save_json)
@@ -1079,6 +1261,8 @@ class MainWindow(QMainWindow):
         card_layout.addLayout(fa)
         card_layout.addWidget(load_json_btn)
         card_layout.addWidget(exp_btn)
+        card_layout.addWidget(plots_btn)
+        card_layout.addWidget(excel_btn)
         card_layout.addWidget(json_btn)
 
         card = QFrame()
@@ -1124,6 +1308,16 @@ class MainWindow(QMainWindow):
         self.speed_combo.setCurrentText("1x")
         self.speed_combo.currentTextChanged.connect(self._on_speed_changed)
 
+        self.label_mode_btn = QPushButton("Labeling: ON")
+        self.label_mode_btn.setCheckable(True)
+        self.label_mode_btn.setChecked(True)
+        self.label_mode_btn.setObjectName("Secondary")
+        self.label_mode_btn.setStyleSheet(
+            "QPushButton:checked { background:#16A34A; color:#FFFFFF; border:none; }"
+            "QPushButton:!checked { background:#6B7280; color:#FFFFFF; border:none; }"
+        )
+        self.label_mode_btn.clicked.connect(self._toggle_label_mode)
+
         ctrls = QHBoxLayout()
         ctrls.setSpacing(8)
         ctrls.addWidget(self.back_btn)
@@ -1131,12 +1325,13 @@ class MainWindow(QMainWindow):
         ctrls.addWidget(self.fwd_btn)
         ctrls.addWidget(self.frame_lbl)
         ctrls.addStretch(1)
+        ctrls.addWidget(self.label_mode_btn)
         ctrls.addWidget(QLabel("Speed:"))
         ctrls.addWidget(self.speed_combo)
 
         # ---- bottom timeline scrubber ----
         self.timeline = AnnotationTimeline(self.store, self.fps, self.total_frames)
-        self.timeline.frameSelected.connect(self.seek_to)
+        self.timeline.frameSelected.connect(self._on_slider_seek)
 
         # ---- keyboard shortcuts for frame stepping ----
         QShortcut(
@@ -1214,6 +1409,8 @@ class MainWindow(QMainWindow):
             )
         # clear name field so next annotation gets a fresh auto-name
         self.name_edit.clear()
+        # auto-disarm so the mode state is always explicit (arm → draw → off)
+        self.bbox_btn.setChecked(False)
 
     def _map(self, lx: int, ly: int) -> Optional[Tuple[int, int]]:
         """Label-widget coords → video-frame coords."""
@@ -1231,30 +1428,15 @@ class MainWindow(QMainWindow):
         return (fx, fy)
 
     def _on_behavior_selected(self, label: str):
-        old = self.store.behavior_per_frame[self.current_frame_idx]
         self._current_behavior = label
         self.store.set_behavior(self.current_frame_idx, label)
-        # Propagate forward through frames that had the old label (or were unset)
-        for i in range(self.current_frame_idx + 1, self.store.total_frames):
-            v = self.store.behavior_per_frame[i]
-            if v is None or v == old:
-                self.store.set_behavior(i, label)
-            else:
-                break
         if hasattr(self, "timeline"):
             self.timeline.update()
         self.statusBar().showMessage(f"Behavior: {label}")
 
     def _on_habitat_selected(self, label: str):
-        old = self.store.habitat_per_frame[self.current_frame_idx]
         self._current_habitat = label
         self.store.set_habitat(self.current_frame_idx, label)
-        for i in range(self.current_frame_idx + 1, self.store.total_frames):
-            v = self.store.habitat_per_frame[i]
-            if v is None or v == old:
-                self.store.set_habitat(i, label)
-            else:
-                break
         if hasattr(self, "timeline"):
             self.timeline.update()
         self.statusBar().showMessage(f"Habitat: {label}")
@@ -1278,18 +1460,18 @@ class MainWindow(QMainWindow):
         self.species_combo.setCompleter(completer)
 
     def _ensure_scene_labels(self, idx: int):
-        # Persist-until-changed behavior: if current frame has no label, inherit current selection.
-        if self.store.behavior_per_frame[idx] is None:
-            self.store.set_behavior(idx, self._current_behavior)
-        else:
-            self._current_behavior = self.store.behavior_per_frame[idx]  # keep UI consistent
+        stored_beh = self.store.behavior_per_frame[idx]
+        stored_hab = self.store.habitat_per_frame[idx]
 
-        if self.store.habitat_per_frame[idx] is None:
-            self.store.set_habitat(idx, self._current_habitat)
-        else:
-            self._current_habitat = self.store.habitat_per_frame[idx]
+        if not self.playing:
+            # Seek/drag: update _current_* from stored values so the UI shows
+            # what was annotated here, and future playback continues from it.
+            if stored_beh is not None:
+                self._current_behavior = stored_beh
+            if stored_hab is not None:
+                self._current_habitat = stored_hab
+        # During playback: _current_* stays fixed; _tick writes it to each frame.
 
-        # Sync highlight state
         if self._current_behavior in self._behavior_btns:
             self._behavior_btns[self._current_behavior].setChecked(True)
         if self._current_habitat in self._habitat_btns:
@@ -1418,11 +1600,24 @@ class MainWindow(QMainWindow):
         else:
             self.timer.stop()
 
+    def _toggle_label_mode(self, checked: bool):
+        self._labeling = checked
+        self.label_mode_btn.setText("Labeling: ON" if checked else "Labeling: OFF")
+
     def _on_speed_changed(self, text: str):
         self._play_speed = float(text.replace('x', ''))
         if self.timer.isActive():
             interval = max(1, int(33 / self._play_speed))
             self.timer.setInterval(interval)
+
+    def _on_slider_seek(self, idx: int):
+        if self._labeling and idx > self.current_frame_idx:
+            for f in range(self.current_frame_idx, idx + 1):
+                self.store.set_behavior(f, self._current_behavior)
+                self.store.set_habitat(f, self._current_habitat)
+            if hasattr(self, "timeline"):
+                self.timeline.update()
+        self.seek_to(idx)
 
     def _tick(self):
         if self.current_frame_idx >= self.total_frames - 1:
@@ -1430,6 +1625,9 @@ class MainWindow(QMainWindow):
             self.play_btn.setText("Play")
             self.timer.stop()
             return
+        if self._labeling:
+            self.store.set_behavior(self.current_frame_idx, self._current_behavior)
+            self.store.set_habitat(self.current_frame_idx, self._current_habitat)
         self.seek_to(self.current_frame_idx + 1)
 
     def seek_to(self, idx: int):
@@ -1534,14 +1732,34 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Plot error", f"Error generating plots:\n{e}")
             return []
 
+    @staticmethod
+    def _propagate(timeline):
+        """Forward-fill a per-frame label list (None gaps inherit the last set value)."""
+        out     = list(timeline)
+        current = None
+        for i, v in enumerate(out):
+            if v is not None:
+                current = v
+            elif current is not None:
+                out[i] = current
+        return out
+
     def _render_plots(self, base_path, plt, Counter, defaultdict) -> list:
+        from matplotlib.patches import Patch
 
-        store  = self.store
-        fps    = max(float(self.fps), 1e-6)
-        total  = self.total_frames
-        saved  = []
+        store = self.store
+        total = self.total_frames
+        saved = []
 
-        # ── palette matching the app UI ───────────────────────────────────
+        # Forward-propagate so every frame inherits its nearest prior label.
+        # This means a habitat annotated at frame 20 applies to frames 20-N
+        # until the next annotation, matching the "persist until changed" UX.
+        hab_timeline = self._propagate(store.habitat_per_frame)
+        beh_timeline = self._propagate(store.behavior_per_frame)
+
+        WHITE = "#FFFFFF"
+        BG    = "#F8FAFC"
+
         HAB_COLORS = {
             "Mangrove":     "#10B981",
             "Rocky reef":   "#0EA5E9",
@@ -1549,152 +1767,359 @@ class MainWindow(QMainWindow):
             "Gravel":       "#9CA3AF",
             "Mud":          "#78644A",
         }
+        BEH_COLORS = [
+            "#4F46E5", "#06B6D4", "#10B981", "#F59E0B", "#EF4444",
+            "#EC4899", "#8B5CF6", "#0EA5E9", "#14B8A6",
+        ]
+        CAT_COLORS = {
+            "Shark":        "#3B82F6",
+            "Ray":          "#06B6D4",
+            "Teleost fish": "#10B981",
+            "Sea turtle":   "#F59E0B",
+            "Other":        "#94A3B8",
+        }
         DEFAULT_CLR = "#94A3B8"
 
-        def _style(ax, title, xlabel, ylabel):
-            ax.set_title(title, fontsize=15, fontweight="bold", pad=14, color="#0F172A")
-            ax.set_xlabel(xlabel, fontsize=11, labelpad=8, color="#334155")
-            ax.set_ylabel(ylabel, fontsize=11, labelpad=8, color="#334155")
-            ax.tick_params(axis="both", colors="#475569", labelsize=10)
-            ax.set_facecolor("#F8FAFC")
-            for s in ("top", "right"):
-                ax.spines[s].set_visible(False)
-            ax.spines["left"].set_color("#CBD5E1")
-            ax.spines["bottom"].set_color("#CBD5E1")
-            ax.yaxis.grid(True, color="#E2E8F0", linewidth=0.8, zorder=0)
+        def _donut(ax, short_labels, vals, colors, title, title_color="#0F172A",
+                   center_text=""):
+            _, _, autotexts = ax.pie(
+                vals, labels=None, colors=colors,
+                autopct=lambda p: f"{p:.1f}%" if p >= 5 else "",
+                pctdistance=0.78,
+                startangle=90, counterclock=False,
+                wedgeprops={"linewidth": 3, "edgecolor": WHITE, "width": 0.52},
+            )
+            for at in autotexts:
+                at.set_fontsize(9); at.set_fontweight("bold"); at.set_color("#1E293B")
+            ax.text(0, 0, center_text, ha="center", va="center",
+                    fontsize=13, fontweight="bold", color="#0F172A", linespacing=1.5)
+            ax.set_title(title, fontsize=16, fontweight="bold", pad=20,
+                         color=title_color)
+
+        def _hbar(ax, species, counts, colors, cat_for_sp, title,
+                  title_color="#0F172A"):
+            peak = max(counts)
+            y    = np.arange(len(species))
+            bars = ax.barh(y, counts, color=colors, height=0.58,
+                           edgecolor=WHITE, linewidth=1.5, zorder=3)
+            for bar, c in zip(bars, counts):
+                ax.text(bar.get_width() + peak * 0.02,
+                        bar.get_y() + bar.get_height() / 2,
+                        str(c), va="center", ha="left",
+                        fontsize=10, fontweight="700", color="#1E293B")
+            ax.set_yticks(y)
+            ax.set_yticklabels(species, fontsize=10, color="#334155")
+            ax.set_xlabel("Animals Observed", fontsize=11, labelpad=8, color="#334155")
+            ax.set_title(title, fontsize=16, fontweight="bold",
+                         pad=14, color=title_color)
+            ax.set_xlim(0, peak * 1.18)
+            ax.xaxis.grid(True, color="#E2E8F0", linewidth=0.8, zorder=0)
             ax.set_axisbelow(True)
+            ax.tick_params(axis="both", colors="#475569", labelsize=10)
+            for s in ("top", "right", "left"):
+                ax.spines[s].set_visible(False)
+            ax.spines["bottom"].set_color("#CBD5E1")
+            seen_cats = sorted({cat_for_sp.get(sp, "Other") for sp in species})
+            if len(seen_cats) > 1:
+                handles = [Patch(facecolor=CAT_COLORS.get(c, DEFAULT_CLR),
+                                 edgecolor=WHITE, label=c) for c in seen_cats]
+                leg = ax.legend(handles=handles, title="Category",
+                                fontsize=9, title_fontsize=10,
+                                framealpha=0.95, edgecolor="#E2E8F0", loc="lower right")
+                leg.get_frame().set_linewidth(0.8)
 
-        hab_counts = Counter(lab for lab in store.habitat_per_frame if lab)
+        def _fish_badge(ax, species, counts_map, cat_for_sp):
+            fish = [s for s in species if cat_for_sp.get(s) == "Teleost fish"]
+            if not fish:
+                return
+            n_sp  = len(fish)
+            total_fish = sum(counts_map[s] for s in fish)
+            label = f"Teleost fish: {n_sp} {'species' if n_sp != 1 else 'species'}  ·  {total_fish} individuals"
+            ax.text(0.01, 0.99, label, transform=ax.transAxes,
+                    fontsize=9.5, va="top", ha="left",
+                    color=CAT_COLORS["Teleost fish"], fontweight="600",
+                    bbox=dict(boxstyle="round,pad=0.4", facecolor="#ECFDF5",
+                              edgecolor="#6EE7B7", linewidth=1.2, alpha=0.92))
 
-        # ── 1. Time spent in each habitat ─────────────────────────────────
-        if hab_counts:
-            habs = list(hab_counts.keys())
-            secs = [hab_counts[h] / fps for h in habs]
-            cols = [HAB_COLORS.get(h, DEFAULT_CLR) for h in habs]
-            peak = max(secs)
+        def _feat_habitat(feat):
+            # Use propagated timeline so a bbox at frame 5 picks up habitat
+            # annotated at frame 1 even if frame 5 itself has no raw label.
+            habs = [hab_timeline[f]
+                    for f in range(feat.init_frame, min(feat.end_frame + 1, total))
+                    if hab_timeline[f]]
+            return Counter(habs).most_common(1)[0][0] if habs else None
 
-            fig, ax = plt.subplots(figsize=(8, 5))
-            fig.patch.set_facecolor("#FFFFFF")
-            bars = ax.bar(habs, secs, color=cols, width=0.45,
-                          edgecolor="#FFFFFF", linewidth=1.8, zorder=3)
-            for bar, s in zip(bars, secs):
-                ax.text(bar.get_x() + bar.get_width() / 2,
-                        s + peak * 0.025,
-                        f"{s:.1f}s",
-                        ha="center", va="bottom",
-                        fontsize=10, fontweight="600", color="#1E293B")
-            _style(ax, "Time Spent in Each Habitat", "Habitat", "Duration (seconds)")
-            plt.tight_layout(pad=1.8)
-            out = f"{base_path}_1_habitat_time.png"
-            fig.savefig(out, dpi=200, bbox_inches="tight", facecolor="#FFFFFF")
+        # ── build global species / cat maps and habitat list ─────────
+        species_counts = Counter()
+        cat_for_species = {}
+        for feat in store.features:
+            sp = feat.species or feat.species_category or "Unknown"
+            species_counts[sp] += feat.count
+            cat_for_species[sp] = feat.species_category or "Other"
+
+        all_habitats = sorted(set(h for h in hab_timeline if h))
+
+        # ── 1. Species observed — overall + per-habitat side by side ───
+        if species_counts:
+            # All species sorted by total count (ascending = top of chart = most)
+            all_sp  = sorted(species_counts, key=lambda s: species_counts[s])
+            n_sp    = len(all_sp)
+            y_pos   = np.arange(n_sp)
+
+            # Per-habitat species data (same _feat_habitat logic)
+            sp_hab_counts = {}   # hab -> Counter
+            sp_hab_cats   = {}   # hab -> {sp: cat}
+            for hab in all_habitats:
+                c, cat = Counter(), {}
+                for feat in store.features:
+                    if _feat_habitat(feat) == hab:
+                        sp = feat.species or feat.species_category or "Unknown"
+                        c[sp]   += feat.count
+                        cat[sp]  = feat.species_category or "Other"
+                sp_hab_counts[hab] = c
+                sp_hab_cats[hab]   = cat
+
+            n_cols  = 1 + len(all_habitats)
+            height  = max(5.0, n_sp * 0.42 + 2.2)
+            # First col needs room for species labels; rest just bars + count labels
+            col_w   = [3.8] + [2.6] * len(all_habitats)
+            fig, axes = plt.subplots(
+                1, n_cols,
+                figsize=(sum(col_w), height),
+                sharey=True,
+                gridspec_kw={"width_ratios": col_w},
+            )
+            if n_cols == 1:
+                axes = [axes]
+            fig.patch.set_facecolor(WHITE)
+            fig.subplots_adjust(wspace=0.06)
+
+            def _hbar_col(ax, counts_map, cat_map, title, title_color="#0F172A",
+                          show_ylabels=True):
+                counts = [counts_map.get(s, 0) for s in all_sp]
+                colors = [CAT_COLORS.get(cat_map.get(s, "Other"), DEFAULT_CLR)
+                          for s in all_sp]
+                peak   = max((c for c in counts if c > 0), default=1)
+                bars   = ax.barh(y_pos, counts, color=colors, height=0.62,
+                                 edgecolor=WHITE, linewidth=1.2, zorder=3)
+                for bar, c in zip(bars, counts):
+                    if c > 0:
+                        ax.text(bar.get_width() + peak * 0.04,
+                                bar.get_y() + bar.get_height() / 2,
+                                str(c), va="center", ha="left",
+                                fontsize=8.5, fontweight="700", color="#1E293B")
+                ax.set_yticks(y_pos)
+                if show_ylabels:
+                    ax.set_yticklabels(all_sp, fontsize=9, color="#334155")
+                else:
+                    ax.set_yticklabels([])
+                ax.set_title(title, fontsize=11, fontweight="bold",
+                             pad=10, color=title_color)
+                ax.set_xlim(0, peak * 1.22)
+                ax.xaxis.grid(True, color="#E2E8F0", linewidth=0.7, zorder=0)
+                ax.set_axisbelow(True)
+                ax.set_facecolor(BG)
+                ax.tick_params(axis="both", colors="#475569", labelsize=8.5)
+                for sp in ("top", "right", "left"):
+                    ax.spines[sp].set_visible(False)
+                ax.spines["bottom"].set_color("#CBD5E1")
+                ax.set_xlabel("Count", fontsize=9, labelpad=5, color="#334155")
+                # Fish badge
+                fish = [s for s in all_sp
+                        if cat_map.get(s) == "Teleost fish"
+                        and counts_map.get(s, 0) > 0]
+                if fish:
+                    n_f  = len(fish)
+                    tot  = sum(counts_map[s] for s in fish)
+                    lbl  = f"🐟 {n_f} sp · {tot} ind"
+                    ax.text(0.97, 0.01, lbl, transform=ax.transAxes,
+                            fontsize=8, va="bottom", ha="right",
+                            color=CAT_COLORS["Teleost fish"], fontweight="600",
+                            bbox=dict(boxstyle="round,pad=0.3", facecolor="#ECFDF5",
+                                      edgecolor="#6EE7B7", linewidth=1.0, alpha=0.9))
+
+            # Overall column
+            _hbar_col(axes[0], species_counts, cat_for_species,
+                      "All Habitats", show_ylabels=True)
+
+            # Per-habitat columns
+            for i, hab in enumerate(all_habitats):
+                _hbar_col(axes[i + 1],
+                          sp_hab_counts[hab], sp_hab_cats[hab],
+                          hab, title_color=HAB_COLORS.get(hab, DEFAULT_CLR),
+                          show_ylabels=False)
+
+            # Category legend on the overall column
+            seen_cats = sorted({cat_for_species[s] for s in all_sp})
+            if len(seen_cats) > 1:
+                handles = [Patch(facecolor=CAT_COLORS.get(c, DEFAULT_CLR),
+                                 edgecolor=WHITE, label=c) for c in seen_cats]
+                leg = axes[0].legend(handles=handles, title="Category",
+                                     fontsize=8, title_fontsize=9,
+                                     framealpha=0.95, edgecolor="#E2E8F0",
+                                     loc="lower right")
+                leg.get_frame().set_linewidth(0.8)
+
+            out = f"{base_path}_1_species.png"
+            fig.savefig(out, dpi=200, bbox_inches="tight", facecolor=WHITE)
             plt.close(fig)
             saved.append(out)
 
-        # ── 2. Animal sightings per minute by habitat ─────────────────────
-        hab_sightings = Counter()
-        for feat in store.features:
-            feat_habs = [store.habitat_per_frame[f]
-                         for f in range(feat.init_frame, min(feat.end_frame + 1, total))
-                         if store.habitat_per_frame[f]]
-            if feat_habs:
-                hab_sightings[Counter(feat_habs).most_common(1)[0][0]] += feat.count
-
-        all_habs = sorted(set(list(hab_counts.keys()) + list(hab_sightings.keys())))
-        if all_habs:
-            rates = []
-            for h in all_habs:
-                mins = hab_counts.get(h, 0) / fps / 60.0
-                rates.append(hab_sightings.get(h, 0) / mins if mins > 0 else 0.0)
-            cols = [HAB_COLORS.get(h, DEFAULT_CLR) for h in all_habs]
-            peak = max(rates) if rates else 0.0
-
-            fig, ax = plt.subplots(figsize=(8, 5))
-            fig.patch.set_facecolor("#FFFFFF")
-            bars = ax.bar(all_habs, rates, color=cols, width=0.45,
-                          edgecolor="#FFFFFF", linewidth=1.8, zorder=3)
-            for bar, r in zip(bars, rates):
-                ax.text(bar.get_x() + bar.get_width() / 2,
-                        r + max(peak * 0.025, 0.005),
-                        f"{r:.2f}",
-                        ha="center", va="bottom",
-                        fontsize=10, fontweight="600", color="#1E293B")
-            _style(ax, "Animal Sightings per Minute by Habitat",
-                   "Habitat", "Sightings / minute")
-            plt.tight_layout(pad=1.8)
-            out = f"{base_path}_2_sightings_per_min.png"
-            fig.savefig(out, dpi=200, bbox_inches="tight", facecolor="#FFFFFF")
-            plt.close(fig)
-            saved.append(out)
-
-        # ── 3. Species category distribution by habitat ───────────────────
-        cat_hab = defaultdict(Counter)
-        for feat in store.features:
-            feat_habs = [store.habitat_per_frame[f]
-                         for f in range(feat.init_frame, min(feat.end_frame + 1, total))
-                         if store.habitat_per_frame[f]]
-            if feat_habs:
-                dom = Counter(feat_habs).most_common(1)[0][0]
-                cat_hab[feat.species_category or "Other"][dom] += feat.count
-
-        categories = sorted(cat_hab.keys())
-        plot_habs = sorted(set(h for cnt in cat_hab.values() for h in cnt))
-
-        if categories and plot_habs:
-            n_habs  = len(plot_habs)
-            group_w = 0.65
-            bar_w   = group_w / max(n_habs, 1)
-
-            fig, ax = plt.subplots(figsize=(9, 5))
-            fig.patch.set_facecolor("#FFFFFF")
-            x = np.arange(len(categories))
-            for j, hab in enumerate(plot_habs):
-                counts = [cat_hab[c].get(hab, 0) for c in categories]
-                offset = (j - n_habs / 2 + 0.5) * bar_w
-                ax.bar(x + offset, counts, width=bar_w * 0.88,
-                       label=hab, color=HAB_COLORS.get(hab, DEFAULT_CLR),
-                       edgecolor="#FFFFFF", linewidth=1.5, zorder=3)
-            ax.set_xticks(x)
-            ax.set_xticklabels(categories, fontsize=10, rotation=15, ha="right")
-            leg = ax.legend(title="Habitat", fontsize=9, title_fontsize=10,
-                            framealpha=0.95, edgecolor="#E2E8F0")
+        # ── 2. Behavior composition — donut chart ─────────────────────
+        beh_counts = Counter(lab for lab in beh_timeline if lab)
+        if beh_counts:
+            ordered = [b for b in BEHAVIOR_OPTIONS if b in beh_counts]
+            ordered += [b for b in beh_counts if b not in ordered]
+            vals    = [beh_counts[b] for b in ordered]
+            colors  = []
+            for b in ordered:
+                try:
+                    colors.append(BEH_COLORS[BEHAVIOR_OPTIONS.index(b) % len(BEH_COLORS)])
+                except ValueError:
+                    colors.append(DEFAULT_CLR)
+            short = [b.split(" - ", 1)[-1] if " - " in b else b for b in ordered]
+            pct   = 100 * sum(vals) / max(total, 1)
+            fig, ax = plt.subplots(figsize=(9, 7))
+            fig.patch.set_facecolor(WHITE)
+            _donut(ax, short, vals, colors, "Behavior Composition",
+                   center_text=f"{pct:.0f}%\nannotated")
+            handles = [Patch(facecolor=c, edgecolor=WHITE, label=lbl)
+                       for c, lbl in zip(colors, short)]
+            leg = ax.legend(handles=handles,
+                            loc="lower center", bbox_to_anchor=(0.5, -0.14),
+                            ncol=3, fontsize=9, framealpha=0.95, edgecolor="#E2E8F0",
+                            columnspacing=1.0, handlelength=1.2)
             leg.get_frame().set_linewidth(0.8)
-            _style(ax, "Species Category Distribution by Habitat",
-                   "Category", "Number of Animals")
-            plt.tight_layout(pad=1.8)
-            out = f"{base_path}_3_category_habitat.png"
-            fig.savefig(out, dpi=200, bbox_inches="tight", facecolor="#FFFFFF")
+            plt.tight_layout(pad=1.5)
+            out = f"{base_path}_2_behavior.png"
+            fig.savefig(out, dpi=200, bbox_inches="tight", facecolor=WHITE)
             plt.close(fig)
             saved.append(out)
 
-        # ── 4. Sightings over time with habitat shading ───────────────────────
+        # ── 3. Habitat composition — donut chart ──────────────────────
+        hab_counts = Counter(lab for lab in hab_timeline if lab)
+        if hab_counts:
+            ordered = sorted(hab_counts, key=lambda h: hab_counts[h], reverse=True)
+            vals    = [hab_counts[h] for h in ordered]
+            colors  = [HAB_COLORS.get(h, DEFAULT_CLR) for h in ordered]
+            pct     = 100 * sum(vals) / max(total, 1)
+            fig, ax = plt.subplots(figsize=(8, 7))
+            fig.patch.set_facecolor(WHITE)
+            _donut(ax, ordered, vals, colors, "Habitat Composition",
+                   center_text=f"{pct:.0f}%\nannotated")
+            handles = [Patch(facecolor=c, edgecolor=WHITE, label=lbl)
+                       for c, lbl in zip(colors, ordered)]
+            leg = ax.legend(handles=handles,
+                            loc="lower center", bbox_to_anchor=(0.5, -0.08),
+                            ncol=3, fontsize=9, framealpha=0.95, edgecolor="#E2E8F0",
+                            columnspacing=1.0, handlelength=1.2)
+            leg.get_frame().set_linewidth(0.8)
+            plt.tight_layout(pad=1.5)
+            out = f"{base_path}_3_habitat.png"
+            fig.savefig(out, dpi=200, bbox_inches="tight", facecolor=WHITE)
+            plt.close(fig)
+            saved.append(out)
+
+        # ── per-habitat plots ──────────────────────────────────────────
+        if all_habitats:
+            hab_dir = base_path + "_habitat_plots"
+            os.makedirs(hab_dir, exist_ok=True)
+
+            for hab in all_habitats:
+                hab_slug  = hab.lower().replace(" ", "_")
+                hab_color = HAB_COLORS.get(hab, DEFAULT_CLR)
+
+                # ── behavior donut for this habitat ──────────────────
+                beh_in_hab = Counter(
+                    beh_timeline[f]
+                    for f in range(total)
+                    if hab_timeline[f] == hab and beh_timeline[f]
+                )
+                if beh_in_hab:
+                    ord_b = [b for b in BEHAVIOR_OPTIONS if b in beh_in_hab]
+                    ord_b += [b for b in beh_in_hab if b not in ord_b]
+                    vals_b = [beh_in_hab[b] for b in ord_b]
+                    cols_b = []
+                    for b in ord_b:
+                        try:
+                            cols_b.append(BEH_COLORS[BEHAVIOR_OPTIONS.index(b)
+                                                      % len(BEH_COLORS)])
+                        except ValueError:
+                            cols_b.append(DEFAULT_CLR)
+                    short_b = [b.split(" - ", 1)[-1] if " - " in b else b
+                               for b in ord_b]
+                    fig, ax = plt.subplots(figsize=(9, 7))
+                    fig.patch.set_facecolor(WHITE)
+                    _donut(ax, short_b, vals_b, cols_b,
+                           f"Behavior — {hab}", title_color=hab_color,
+                           center_text=f"{sum(vals_b)}\nframes")
+                    handles_b = [Patch(facecolor=c, edgecolor=WHITE, label=lbl)
+                                 for c, lbl in zip(cols_b, short_b)]
+                    leg = ax.legend(handles=handles_b,
+                                    loc="lower center", bbox_to_anchor=(0.5, -0.14),
+                                    ncol=3, fontsize=9, framealpha=0.95,
+                                    edgecolor="#E2E8F0", columnspacing=1.0,
+                                    handlelength=1.2)
+                    leg.get_frame().set_linewidth(0.8)
+                    plt.tight_layout(pad=1.5)
+                    out = os.path.join(hab_dir, f"{hab_slug}_behavior.png")
+                    fig.savefig(out, dpi=200, bbox_inches="tight", facecolor=WHITE)
+                    plt.close(fig)
+                    saved.append(out)
+
+                # ── species bar for this habitat ─────────────────────
+                sp_in_hab  = Counter()
+                cat_in_hab = {}
+                for feat in store.features:
+                    if _feat_habitat(feat) == hab:
+                        sp = feat.species or feat.species_category or "Unknown"
+                        sp_in_hab[sp] += feat.count
+                        cat_in_hab[sp] = feat.species_category or "Other"
+                if sp_in_hab:
+                    sp_list  = sorted(sp_in_hab, key=lambda s: sp_in_hab[s])
+                    c_list   = [sp_in_hab[s] for s in sp_list]
+                    col_list = [CAT_COLORS.get(cat_in_hab.get(s, "Other"), DEFAULT_CLR)
+                                for s in sp_list]
+                    n_sp   = len(sp_list)
+                    height = max(4.0, n_sp * 0.48 + 2.0)
+                    fig, ax = plt.subplots(figsize=(10, height))
+                    fig.patch.set_facecolor(WHITE)
+                    ax.set_facecolor(BG)
+                    _hbar(ax, sp_list, c_list, col_list, cat_in_hab,
+                          f"Species — {hab}", title_color=hab_color)
+                    _fish_badge(ax, sp_list, sp_in_hab, cat_in_hab)
+                    plt.tight_layout(pad=1.8)
+                    out = os.path.join(hab_dir, f"{hab_slug}_species.png")
+                    fig.savefig(out, dpi=200, bbox_inches="tight", facecolor=WHITE)
+                    plt.close(fig)
+                    saved.append(out)
+
+        # ── 4. Sightings over time with habitat shading ───────────────
         import matplotlib.ticker as mticker
         from matplotlib.transforms import blended_transform_factory
 
+        fps        = max(float(self.fps), 1e-6)
         total_secs = total / fps
 
-        # Rolling window: target ~60 s, clamped between 15 s and ⅛ of video
-        window_s      = max(15.0, min(60.0, total_secs / 8))
+        window_s      = 14.0
         window_frames = max(1, min(int(window_s * fps), total))
 
-        # Count new feature appearances per frame (weighted by count)
         new_sightings = np.zeros(total, dtype=float)
         for feat in store.features:
             if 0 <= feat.init_frame < total:
                 new_sightings[feat.init_frame] += feat.count
 
-        # Rolling sum → rate per minute
         kernel       = np.ones(window_frames)
         rolling_sum  = np.convolve(new_sightings, kernel, mode="same")
         window_mins  = window_frames / fps / 60.0
         rolling_rate = rolling_sum / max(window_mins, 1e-9)
-
-        times = np.arange(total) / fps   # x axis in seconds
+        times        = np.arange(total) / fps
 
         fig, ax = plt.subplots(figsize=(13, 5))
-        fig.patch.set_facecolor("#FFFFFF")
+        fig.patch.set_facecolor(WHITE)
+        ax.set_facecolor(BG)
 
-        # ── habitat background shading ──
-        segs = FeatureStore._compress_timeline(store.habitat_per_frame)
+        segs = FeatureStore._compress_timeline(hab_timeline)
         for seg in segs:
             v = seg.get("value")
             if v is None:
@@ -1702,19 +2127,16 @@ class MainWindow(QMainWindow):
             t_s = seg["start"] / fps
             t_e = (seg["end"] + 1) / fps
             c   = HAB_COLORS.get(v, DEFAULT_CLR)
-            ax.axvspan(t_s, t_e, color=c, alpha=0.13, zorder=0, lw=0)
+            ax.axvspan(t_s, t_e, color=c, alpha=0.15, zorder=0, lw=0)
             if seg["start"] > 0:
                 ax.axvline(t_s, color=c, linewidth=1.0,
-                           linestyle="--", alpha=0.55, zorder=1)
+                           linestyle="--", alpha=0.5, zorder=1)
 
-        # ── sightings line + fill ──
         ax.plot(times, rolling_rate, color="#4F46E5", linewidth=2.2, zorder=3)
         ax.fill_between(times, rolling_rate, alpha=0.14, color="#4F46E5", zorder=2)
-
         ax.set_ylim(bottom=0)
         ax.set_xlim(0, times[-1] if len(times) > 1 else 1)
 
-        # ── habitat labels pinned to top of axes ──
         trans = blended_transform_factory(ax.transData, ax.transAxes)
         for seg in segs:
             v = seg.get("value")
@@ -1722,16 +2144,13 @@ class MainWindow(QMainWindow):
                 continue
             t_s = seg["start"] / fps
             t_e = (seg["end"] + 1) / fps
-            seg_secs = t_e - t_s
-            if seg_secs < total_secs * 0.04:
+            if (t_e - t_s) < total_secs * 0.04:
                 continue
-            mid = (t_s + t_e) / 2
-            c   = HAB_COLORS.get(v, DEFAULT_CLR)
-            ax.text(mid, 0.97, v, ha="center", va="top",
-                    transform=trans, fontsize=9,
-                    fontweight="600", color=c)
+            c = HAB_COLORS.get(v, DEFAULT_CLR)
+            ax.text((t_s + t_e) / 2, 0.97, v,
+                    ha="center", va="top", transform=trans,
+                    fontsize=9, fontweight="600", color=c)
 
-        # ── time axis formatting ──
         def _fmt_time(x, _):
             s = int(max(0, x))
             return f"{s // 60}:{s % 60:02d}"
@@ -1739,15 +2158,121 @@ class MainWindow(QMainWindow):
         ax.xaxis.set_major_formatter(mticker.FuncFormatter(_fmt_time))
         ax.xaxis.set_major_locator(mticker.MaxNLocator(10, integer=False))
 
-        _style(ax,
-               f"Animal Sightings Over Time  (rolling {window_s:.0f} s window)",
-               "Time (m:ss)", "Sightings / minute")
+        ax.set_title(f"Animal Sightings Over Time  (rolling {window_s:.0f} s window)",
+                     fontsize=15, fontweight="bold", pad=14, color="#0F172A")
+        ax.set_xlabel("Time (m:ss)", fontsize=11, labelpad=8, color="#334155")
+        ax.set_ylabel("Sightings / minute", fontsize=11, labelpad=8, color="#334155")
+        ax.tick_params(axis="both", colors="#475569", labelsize=10)
+        for sp in ("top", "right"):
+            ax.spines[sp].set_visible(False)
+        ax.spines["left"].set_color("#CBD5E1")
+        ax.spines["bottom"].set_color("#CBD5E1")
+        ax.yaxis.grid(True, color="#E2E8F0", linewidth=0.8, zorder=0)
+        ax.set_axisbelow(True)
+
+        # Habitat color legend
+        hab_seen = sorted({seg["value"] for seg in segs if seg.get("value")})
+        if hab_seen:
+            from matplotlib.patches import Patch as _Patch
+            handles = [_Patch(facecolor=HAB_COLORS.get(h, DEFAULT_CLR),
+                              alpha=0.55, edgecolor="none", label=h)
+                       for h in hab_seen]
+            leg = ax.legend(handles=handles, title="Habitat",
+                            fontsize=9, title_fontsize=10,
+                            framealpha=0.95, edgecolor="#E2E8F0",
+                            loc="upper right")
+            leg.get_frame().set_linewidth(0.8)
 
         plt.tight_layout(pad=1.8)
         out = f"{base_path}_4_sightings_over_time.png"
-        fig.savefig(out, dpi=200, bbox_inches="tight", facecolor="#FFFFFF")
+        fig.savefig(out, dpi=200, bbox_inches="tight", facecolor=WHITE)
         plt.close(fig)
         saved.append(out)
+
+        # ── 5. Per-species sighting timelines ─────────────────────────
+        if species_counts and total > 1:
+            sp_dir = base_path + "_species_timelines"
+            os.makedirs(sp_dir, exist_ok=True)
+
+            def _timeline_ax(ax, sightings_arr, line_color, title):
+                roll = np.convolve(sightings_arr, np.ones(window_frames),
+                                   mode="same") / max(window_mins, 1e-9)
+                for seg in segs:
+                    v = seg.get("value")
+                    if v is None:
+                        continue
+                    t_s = seg["start"] / fps
+                    t_e = (seg["end"] + 1) / fps
+                    c   = HAB_COLORS.get(v, DEFAULT_CLR)
+                    ax.axvspan(t_s, t_e, color=c, alpha=0.15, zorder=0, lw=0)
+                    if seg["start"] > 0:
+                        ax.axvline(t_s, color=c, linewidth=1.0,
+                                   linestyle="--", alpha=0.5, zorder=1)
+                ax.plot(times, roll, color=line_color, linewidth=2.2, zorder=3)
+                ax.fill_between(times, roll, alpha=0.14,
+                                color=line_color, zorder=2)
+                ax.set_ylim(bottom=0)
+                ax.set_xlim(0, times[-1] if len(times) > 1 else 1)
+                trans = blended_transform_factory(ax.transData, ax.transAxes)
+                for seg in segs:
+                    v = seg.get("value")
+                    if v is None:
+                        continue
+                    t_s = seg["start"] / fps
+                    t_e = (seg["end"] + 1) / fps
+                    if (t_e - t_s) < total_secs * 0.04:
+                        continue
+                    ax.text((t_s + t_e) / 2, 0.97, v,
+                            ha="center", va="top", transform=trans,
+                            fontsize=9, fontweight="600",
+                            color=HAB_COLORS.get(v, DEFAULT_CLR))
+                ax.xaxis.set_major_formatter(mticker.FuncFormatter(_fmt_time))
+                ax.xaxis.set_major_locator(mticker.MaxNLocator(10, integer=False))
+                ax.set_title(title, fontsize=13, fontweight="bold",
+                             pad=12, color="#0F172A")
+                ax.set_xlabel("Time (m:ss)", fontsize=10, labelpad=6,
+                              color="#334155")
+                ax.set_ylabel("Sightings / minute", fontsize=10,
+                              labelpad=6, color="#334155")
+                ax.tick_params(axis="both", colors="#475569", labelsize=9)
+                for sp in ("top", "right"):
+                    ax.spines[sp].set_visible(False)
+                ax.spines["left"].set_color("#CBD5E1")
+                ax.spines["bottom"].set_color("#CBD5E1")
+                ax.yaxis.grid(True, color="#E2E8F0", linewidth=0.7, zorder=0)
+                ax.set_axisbelow(True)
+                if hab_seen:
+                    from matplotlib.patches import Patch as _P
+                    hleg = ax.legend(
+                        handles=[_P(facecolor=HAB_COLORS.get(h, DEFAULT_CLR),
+                                    alpha=0.55, edgecolor="none", label=h)
+                                 for h in hab_seen],
+                        title="Habitat", fontsize=8, title_fontsize=9,
+                        framealpha=0.95, edgecolor="#E2E8F0",
+                        loc="upper right")
+                    hleg.get_frame().set_linewidth(0.8)
+
+            for sp_name in sorted(species_counts):
+                sp_arr = np.zeros(total, dtype=float)
+                for feat in store.features:
+                    key = feat.species or feat.species_category or "Unknown"
+                    if key == sp_name and 0 <= feat.init_frame < total:
+                        sp_arr[feat.init_frame] += feat.count
+                if not sp_arr.any():
+                    continue
+                cat        = cat_for_species.get(sp_name, "Other")
+                line_color = CAT_COLORS.get(cat, DEFAULT_CLR)
+                slug       = re.sub(r"[^\w]+", "_", sp_name).strip("_").lower()
+                fig, ax    = plt.subplots(figsize=(13, 4))
+                fig.patch.set_facecolor(WHITE)
+                ax.set_facecolor(BG)
+                _timeline_ax(ax, sp_arr, line_color,
+                             f"{sp_name}  (rolling {window_s:.0f} s window)")
+                plt.tight_layout(pad=1.5)
+                out = os.path.join(sp_dir, f"{slug}_timeline.png")
+                fig.savefig(out, dpi=180, bbox_inches="tight", facecolor=WHITE)
+                plt.close(fig)
+                saved.append(out)
 
         return saved
 
@@ -1773,12 +2298,245 @@ class MainWindow(QMainWindow):
             saved_plots = self._save_plots(base)
             msg = f"Exported:\n{p}"
             if saved_plots:
-                msg += "\n\nPlots saved:\n" + "\n".join(
-                    os.path.basename(pp) for pp in saved_plots
-                )
+                msg += "\n\n" + self._plots_summary(saved_plots)
             QMessageBox.information(self, "Done", msg)
         except Exception as e:
             QMessageBox.critical(self, "Export Error", str(e))
+
+    def _export_plots_only(self):
+        if self.playing:
+            self.toggle_play()
+        p, _ = QFileDialog.getSaveFileName(
+            self, "Export plots — choose base filename",
+            self.video_path + ".plots", "All files (*)")
+        if not p:
+            return
+        base = os.path.splitext(p)[0] if "." in os.path.basename(p) else p
+        try:
+            saved_plots = self._save_plots(base)
+            if not saved_plots:
+                QMessageBox.information(self, "Export Plots", "No plots were generated.")
+                return
+            QMessageBox.information(self, "Done", self._plots_summary(saved_plots))
+        except Exception as e:
+            QMessageBox.critical(self, "Export Error", str(e))
+
+    def _export_excel(self):
+        if self.playing:
+            self.toggle_play()
+        try:
+            import openpyxl
+        except ImportError:
+            QMessageBox.warning(self, "Missing dependency",
+                                "openpyxl is required for Excel export.\n"
+                                "Install with: pip install openpyxl")
+            return
+        p, _ = QFileDialog.getSaveFileName(
+            self, "Export Excel",
+            self.video_path + ".annotated.xlsx", "Excel (*.xlsx)")
+        if not p:
+            return
+        try:
+            wb = self._build_workbook(openpyxl)
+            wb.save(p)
+            QMessageBox.information(self, "Done", f"Excel saved:\n{p}")
+        except Exception as e:
+            QMessageBox.critical(self, "Excel Export Error", str(e))
+
+    def _build_workbook(self, openpyxl):
+        from openpyxl.chart import BarChart, PieChart, Reference
+        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.utils import get_column_letter
+        from collections import Counter
+
+        wb    = openpyxl.Workbook()
+        store = self.store
+        fps   = max(float(self.fps), 1e-6)
+        total = self.total_frames
+
+        hab_tl = self._propagate(store.habitat_per_frame)
+        beh_tl = self._propagate(store.behavior_per_frame)
+
+        HEADER_FILL = PatternFill("solid", fgColor="0F172A")
+        HEADER_FONT = Font(color="FFFFFF", bold=True, size=10)
+        ALT_FILL    = PatternFill("solid", fgColor="F1F5F9")
+
+        def _hrow(ws, cols):
+            for c, t in enumerate(cols, 1):
+                cell = ws.cell(row=1, column=c, value=t)
+                cell.fill = HEADER_FILL
+                cell.font = HEADER_FONT
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            ws.row_dimensions[1].height = 18
+
+        def _autowidth(ws, mn=8, mx=40):
+            for col in ws.columns:
+                w = max(len(str(cell.value or "")) for cell in col)
+                ws.column_dimensions[
+                    get_column_letter(col[0].column)].width = min(mx, max(mn, w + 2))
+
+        def _t(frames):
+            s = int(frames / fps)
+            return f"{s // 60}:{s % 60:02d}"
+
+        # ── Sheet 1: Sightings flat table ─────────────────────────
+        ws1 = wb.active
+        ws1.title = "Sightings"
+        _hrow(ws1, ["Frame", "Time", "Name", "Category", "Species",
+                    "Count", "Behavior", "Habitat"])
+        ws1.freeze_panes = "A2"
+        for r, feat in enumerate(
+                sorted(store.features, key=lambda f: f.init_frame), 2):
+            fi = feat.init_frame
+            for c, v in enumerate([
+                fi, _t(fi), feat.name,
+                feat.species_category or "",
+                feat.species or "",
+                feat.count,
+                beh_tl[fi] or "",
+                hab_tl[fi] or "",
+            ], 1):
+                cell = ws1.cell(row=r, column=c, value=v)
+                if r % 2 == 0:
+                    cell.fill = ALT_FILL
+        _autowidth(ws1)
+
+        # ── Sheet 2: Species Summary + bar chart ──────────────────
+        ws2 = wb.create_sheet("Species Summary")
+        _hrow(ws2, ["Species", "Category", "Count"])
+        ws2.freeze_panes = "A2"
+        sp_counts = Counter()
+        sp_cats   = {}
+        for feat in store.features:
+            sp = feat.species or feat.species_category or "Unknown"
+            sp_counts[sp] += feat.count
+            sp_cats[sp]    = feat.species_category or "Other"
+        sp_list = sorted(sp_counts, key=lambda s: sp_counts[s], reverse=True)
+        for r, sp in enumerate(sp_list, 2):
+            ws2.cell(row=r, column=1, value=sp)
+            ws2.cell(row=r, column=2, value=sp_cats[sp])
+            ws2.cell(row=r, column=3, value=sp_counts[sp])
+        _autowidth(ws2)
+        if sp_list:
+            n   = len(sp_list)
+            ch  = BarChart()
+            ch.type   = "bar"
+            ch.barDir = "bar"
+            ch.title  = "Species Observed"
+            ch.x_axis.title = "Count"
+            ch.y_axis.title = "Species"
+            ch.style  = 10
+            ch.add_data(Reference(ws2, min_col=3, min_row=1, max_row=1+n),
+                        titles_from_data=True)
+            ch.set_categories(Reference(ws2, min_col=1, min_row=2, max_row=1+n))
+            ch.width  = 22
+            ch.height = max(10, n * 0.55)
+            ws2.add_chart(ch, "E2")
+
+        # ── Sheet 3: Behavior Summary + pie chart ─────────────────
+        ws3 = wb.create_sheet("Behavior Summary")
+        _hrow(ws3, ["Behavior", "Frames", "Duration (s)", "% of Annotated"])
+        ws3.freeze_panes = "A2"
+        beh_counts = Counter(b for b in beh_tl if b)
+        beh_total  = sum(beh_counts.values()) or 1
+        beh_rows   = [b for b in BEHAVIOR_OPTIONS if b in beh_counts]
+        beh_rows  += [b for b in beh_counts if b not in beh_rows]
+        for r, b in enumerate(beh_rows, 2):
+            f = beh_counts[b]
+            ws3.cell(row=r, column=1, value=b)
+            ws3.cell(row=r, column=2, value=f)
+            ws3.cell(row=r, column=3, value=round(f / fps, 2))
+            ws3.cell(row=r, column=4, value=round(100 * f / beh_total, 1))
+        _autowidth(ws3)
+        if beh_rows:
+            n  = len(beh_rows)
+            ch = PieChart()
+            ch.title  = "Behavior Distribution"
+            ch.style  = 10
+            ch.add_data(Reference(ws3, min_col=3, min_row=1, max_row=1+n),
+                        titles_from_data=True)
+            ch.set_categories(Reference(ws3, min_col=1, min_row=2, max_row=1+n))
+            ch.width  = 18
+            ch.height = 14
+            ws3.add_chart(ch, "F2")
+
+        # ── Sheet 4: Habitat Summary + pie chart ──────────────────
+        ws4 = wb.create_sheet("Habitat Summary")
+        _hrow(ws4, ["Habitat", "Frames", "Duration (s)", "% of Annotated"])
+        ws4.freeze_panes = "A2"
+        hab_counts = Counter(h for h in hab_tl if h)
+        hab_total  = sum(hab_counts.values()) or 1
+        hab_rows   = sorted(hab_counts, key=lambda h: hab_counts[h], reverse=True)
+        for r, h in enumerate(hab_rows, 2):
+            f = hab_counts[h]
+            ws4.cell(row=r, column=1, value=h)
+            ws4.cell(row=r, column=2, value=f)
+            ws4.cell(row=r, column=3, value=round(f / fps, 2))
+            ws4.cell(row=r, column=4, value=round(100 * f / hab_total, 1))
+        _autowidth(ws4)
+        if hab_rows:
+            n  = len(hab_rows)
+            ch = PieChart()
+            ch.title  = "Habitat Distribution"
+            ch.style  = 10
+            ch.add_data(Reference(ws4, min_col=3, min_row=1, max_row=1+n),
+                        titles_from_data=True)
+            ch.set_categories(Reference(ws4, min_col=1, min_row=2, max_row=1+n))
+            ch.width  = 18
+            ch.height = 14
+            ws4.add_chart(ch, "F2")
+
+        # ── Sheet 5: Behavior Timeline (segments) ─────────────────
+        ws5 = wb.create_sheet("Behavior Timeline")
+        _hrow(ws5, ["Start Frame", "Start Time", "End Frame",
+                    "End Time", "Duration (s)", "Behavior"])
+        ws5.freeze_panes = "A2"
+        for r, seg in enumerate(
+                (s for s in FeatureStore._compress_timeline(
+                    store.behavior_per_frame) if s.get("value")), 2):
+            dur = (seg["end"] - seg["start"] + 1) / fps
+            for c, v in enumerate([
+                seg["start"], _t(seg["start"]),
+                seg["end"],   _t(seg["end"]),
+                round(dur, 2), seg["value"],
+            ], 1):
+                ws5.cell(row=r, column=c, value=v)
+        _autowidth(ws5)
+
+        # ── Sheet 6: Habitat Timeline (segments) ──────────────────
+        ws6 = wb.create_sheet("Habitat Timeline")
+        _hrow(ws6, ["Start Frame", "Start Time", "End Frame",
+                    "End Time", "Duration (s)", "Habitat"])
+        ws6.freeze_panes = "A2"
+        for r, seg in enumerate(
+                (s for s in FeatureStore._compress_timeline(
+                    store.habitat_per_frame) if s.get("value")), 2):
+            dur = (seg["end"] - seg["start"] + 1) / fps
+            for c, v in enumerate([
+                seg["start"], _t(seg["start"]),
+                seg["end"],   _t(seg["end"]),
+                round(dur, 2), seg["value"],
+            ], 1):
+                ws6.cell(row=r, column=c, value=v)
+        _autowidth(ws6)
+
+        return wb
+
+    @staticmethod
+    def _plots_summary(saved_plots: list) -> str:
+        main  = [f for f in saved_plots
+                 if "_habitat_plots" not in f and "_species_timelines" not in f]
+        hab   = [f for f in saved_plots if "_habitat_plots" in f]
+        sp    = [f for f in saved_plots if "_species_timelines" in f]
+        lines = [f"{len(saved_plots)} plots saved."]
+        if main:
+            lines.append("Summary plots:\n" + "\n".join(
+                os.path.basename(p) for p in main))
+        if hab:
+            lines.append(f"{len(hab)} habitat plots:\n{os.path.dirname(hab[0])}")
+        if sp:
+            lines.append(f"{len(sp)} species timelines:\n{os.path.dirname(sp[0])}")
+        return "\n\n".join(lines)
 
     def _render(self, out_path):
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")

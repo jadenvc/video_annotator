@@ -63,6 +63,15 @@ sudo apt-get install ffmpeg
 
 ## 🚀 Usage
 
+### Bundled Example
+
+```bash
+./run_shark_example.sh
+```
+
+This extracts frames from `examples/shark_follow.mp4` into
+`examples/shark_follow_frames/`, then launches `run_tracker.py`.
+
 ### Option 1: Frame Directory (Recommended for Python 3.11)
 
 ```bash

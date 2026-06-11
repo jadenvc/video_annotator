@@ -1744,7 +1744,8 @@ def main():
     ckpt = args.checkpoint
     if ckpt is None:
         if getattr(sys, 'frozen', False):
-            here = os.path.dirname(sys.executable)
+            # sys._MEIPASS is Contents/Frameworks/ in a PyInstaller .app bundle
+            here = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
         else:
             here = os.path.dirname(os.path.abspath(__file__))
         ckpt = os.path.join(here, "checkpoints", "edgetam.pt")

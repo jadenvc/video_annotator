@@ -17,6 +17,15 @@ pip install -e ".[tracker]"
 bash checkpoints/download_ckpts.sh
 ```
 
+## Bundled Example
+
+```bash
+./run_shark_example.sh
+```
+
+This extracts frames from `examples/shark_follow.mp4` and opens the tracker on
+the extracted frame directory.
+
 ## Two-Step Process
 
 ### Step 1: Extract Frames with ffmpeg

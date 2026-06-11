@@ -56,7 +56,16 @@ brew install ffmpeg
 sudo apt-get install ffmpeg
 ```
 
-Extract frames from a video and launch the tracker:
+Run the bundled shark example:
+
+```bash
+./run_shark_example.sh
+```
+
+That script extracts frames from `examples/shark_follow.mp4` into
+`examples/shark_follow_frames/`, then starts the tracker.
+
+Or extract frames from your own video and launch the tracker:
 
 ```bash
 ./extract_frames.sh my_clip.mp4
@@ -83,6 +92,9 @@ python run_tracker.py my_clip_frames/ --frames-dir
 Common commands:
 
 ```bash
+# Bundled example
+./run_shark_example.sh
+
 # Basic frame-directory tracking
 python run_tracker.py my_clip_frames/ --frames-dir
 
